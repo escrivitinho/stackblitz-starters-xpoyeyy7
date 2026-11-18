@@ -162,14 +162,27 @@ export default function CategoriesManager({ categories, onChange }: Props) {
             {categories.length === 0 ? <p className="py-6 text-center text-sm text-[#94A0AF]">Nenhuma categoria cadastrada.</p> : (
               <div className="space-y-2">
                 {categories.map((category) => (
-                  <div key={category.id} className={`flex items-center gap-2 rounded-2xl border p-3 ${selectedId === category.id ? "border-[#9AB2D0] bg-[#EDF4FC]" : "border-[#E9EEF4] bg-white/55"}`}>
-                    <button onClick={() => { setSelectedId(category.id); setError(""); }} className="min-w-0 flex-1 text-left">
-                      <span className="block truncate text-sm font-medium text-[#354B68]">{category.name}</span>
-                      <span className={`mt-1 inline-flex rounded-full px-2 py-1 text-[10px] font-medium ${typeStyles[category.type]}`}>{typeLabels[category.type]}</span>
-                      <span className="ml-2 text-[11px] text-[#94A0AF]">{category.subcategories.length} subcategorias</span>
-                    </button>
-                    <button onClick={() => editCategory(category)} className="rounded-lg px-2 py-2 text-xs text-[#71839A] hover:bg-white">Editar</button>
-                    <button onClick={() => removeCategory(category)} className="rounded-lg px-2 py-2 text-xs text-rose-500 hover:bg-rose-50">Excluir</button>
+                  <div key={category.id} className={`rounded-2xl border p-3 ${selectedId === category.id ? "border-[#9AB2D0] bg-[#EDF4FC]" : "border-[#E9EEF4] bg-white/55"}`}>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => { setSelectedId(category.id); setError(""); }} className="min-w-0 flex-1 text-left">
+                        <span className="block truncate text-sm font-semibold text-[#354B68]">{category.name}</span>
+                        <span className={`mt-1 inline-flex rounded-full px-2 py-1 text-[10px] font-medium ${typeStyles[category.type]}`}>{typeLabels[category.type]}</span>
+                      </button>
+                      <button onClick={() => editCategory(category)} title="Editar nome da categoria" className="rounded-lg border border-[#DCE5EF] bg-white/80 px-3 py-2 text-xs font-medium text-[#526B8B] hover:bg-white">✎ Editar nome</button>
+                      <button onClick={() => removeCategory(category)} className="rounded-lg px-2 py-2 text-xs text-rose-500 hover:bg-rose-50">Excluir</button>
+                    </div>
+                    {category.subcategories.length > 0 ? (
+                      <div className="ml-2 mt-3 space-y-1 border-l-2 border-[#DCE5EF] pl-3">
+                        {category.subcategories.map((item) => (
+                          <button key={item} onClick={() => setSelectedId(category.id)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-[#71839A] hover:bg-white/80">
+                            <span className="text-[#A4B3C5]">↳</span>
+                            <span>{item}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="ml-2 mt-2 text-[11px] text-[#A0ACBA]">Nenhuma subcategoria cadastrada</p>
+                    )}
                   </div>
                 ))}
               </div>
