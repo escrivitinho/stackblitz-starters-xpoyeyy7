@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import CategoriesManager, { type Category } from "./categories-manager";
 import { formatCents, parseMoneyToCents } from "./lib/money";
 import {
   calculateTransactionTotals,
@@ -46,26 +47,25 @@ const initialTransactions: Transaction[] = [];
 const navigation = [
   { name: "Visão geral", icon: "▦" },
   { name: "Lançamentos", icon: "⇄" },
+  { name: "Categorias", icon: "⌁" },
   { name: "Contas", icon: "▤" },
   { name: "Cartões", icon: "▣" },
   { name: "Orçamento", icon: "◷" },
   { name: "Relatórios", icon: "▥" },
 ];
 
-const expenseCategories: Record<string, string[]> = {
-  Moradia: ["Aluguel", "Condomínio", "Energia", "Água", "Internet"],
-  Alimentação: ["Supermercado", "Restaurante", "Delivery"],
-  Transporte: ["Combustível", "Aplicativos", "Transporte público"],
-  Saúde: ["Farmácia", "Consultas", "Exames"],
-  Lazer: ["Viagens", "Entretenimento", "Assinaturas"],
-  Outros: ["Compras diversas", "Presentes", "Outros"],
-};
-
-const incomeCategories: Record<string, string[]> = {
-  Salário: ["Salário CLT", "Royalties", "Adiantamento"],
-  Investimentos: ["Rendimentos", "Dividendos", "Juros"],
-  Outros: ["Reembolso", "Venda", "Outras receitas"],
-};
+const initialCategories: Category[] = [
+  { id: "expense-housing", name: "Moradia", type: "expense", subcategories: ["Aluguel", "Condomínio", "Energia", "Água", "Internet"] },
+  { id: "expense-food", name: "Alimentação", type: "expense", subcategories: ["Supermercado", "Restaurante", "Delivery"] },
+  { id: "expense-transport", name: "Transporte", type: "expense", subcategories: ["Combustível", "Aplicativos", "Transporte público"] },
+  { id: "expense-health", name: "Saúde", type: "expense", subcategories: ["Farmácia", "Consultas", "Exames"] },
+  { id: "expense-leisure", name: "Lazer", type: "expense", subcategories: ["Viagens", "Entretenimento", "Assinaturas"] },
+  { id: "expense-other", name: "Outros", type: "expense", subcategories: ["Compras diversas", "Presentes", "Outros"] },
+  { id: "income-salary", name: "Salário", type: "income", subcategories: ["Salário CLT", "Royalties", "Adiantamento"] },
+  { id: "income-investments", name: "Investimentos", type: "income", subcategories: ["Rendimentos", "Dividendos", "Juros"] },
+  { id: "income-other", name: "Outros", type: "income", subcategories: ["Reembolso", "Venda", "Outras receitas"] },
+  { id: "transfer-general", name: "Transferência", type: "transfer", subcategories: ["Entre contas"] },
+];
 
 function money(cents: number | null) {
   return formatCents(cents);
@@ -1239,7 +1239,7 @@ export default function Home() {
         {/* OUTROS MÓDULOS */}
         {/* ================================== */}
 
-        {!["Visão geral", "Contas", "Lançamentos"].includes(active) && (
+        {active === "Categorias" && (\n          <CategoriesManager categories={categories} onChange={setCategories} />\n        )}\n\n        {!["Visão geral", "Contas", "Lançamentos", "Categorias"].includes(active) && (
           <div className="flex min-h-[420px] flex-col items-center justify-center rounded-3xl border border-white/90 bg-white/55 p-8 text-center shadow-sm backdrop-blur-2xl">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7EEF7] text-3xl text-[#526F96]">✧</div>
             <h3 className="mt-5 text-xl font-semibold text-[#263D59]">{active}</h3>
