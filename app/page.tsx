@@ -154,13 +154,14 @@ export default function Home() {
 
   const totals = calculateTransactionTotals(transactions);
 
-  const availableGroups =
-    transactionType === "income"
-      ? incomeCategories
-      : expenseCategories;
+  const availableGroups = categories
+    .filter((category) => category.type === transactionType)
+    .reduce<Record<string, string[]>>((groups, category) => {
+      groups[category.name] = category.subcategories;
+      return groups;
+    }, {});
 
-  const availableSubcategories =
-    availableGroups[transactionGroup] || [];
+  const availableSubcategories = availableGroups[transactionGroup] || [];
 
   function goToPage(page: string) {
     setActive(page);
