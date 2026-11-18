@@ -101,7 +101,6 @@ export default function CategoriesManager({ categories, onChange }: Props) {
   function removeCategory(category: Category) {
     if (!confirm(`Excluir a categoria "${category.name}" e suas subcategorias?`)) return;
     onChange(categories.filter((item) => item.id !== category.id));
-    if (selectedId === category.id) setSelectedId(null);
     if (editingCategoryId === category.id) setEditingCategoryId(null);
   }
 
@@ -213,7 +212,7 @@ export default function CategoriesManager({ categories, onChange }: Props) {
             {categories.length === 0 ? <p className="py-6 text-center text-sm text-[#94A0AF]">Nenhuma categoria cadastrada.</p> : (
               <div className="space-y-2">
                 {categories.map((category) => (
-                  <div key={category.id} className={`rounded-2xl border p-3 ${selectedId === category.id ? "border-[#9AB2D0] bg-[#EDF4FC]" : "border-[#E9EEF4] bg-white/55"}`}>
+                  <div key={category.id} className="rounded-2xl border border-[#E9EEF4] bg-white/55 p-3">
                     <div className="flex items-center gap-2">
                       {editingCategoryId === category.id ? (
                         <div className="min-w-0 flex-1 space-y-2">
