@@ -31,20 +31,16 @@ const typeStyles: Record<CategoryType, string> = {
 export default function CategoriesManager({ categories, onChange }: Props) {
   const [name, setName] = useState("");
   const [type, setType] = useState<CategoryType>("expense");
-  const [subcategory, setSubcategory] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [subcategoryDrafts, setSubcategoryDrafts] = useState<Record<string, string>>({});
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [editingSubcategory, setEditingSubcategory] = useState<{ categoryId: string; originalName: string } | null>(null);
   const [editingSubcategoryName, setEditingSubcategoryName] = useState("");
   const [error, setError] = useState("");
 
-  const selected = categories.find((category) => category.id === selectedId) ?? null;
-
   function resetForm() {
     setName("");
     setType("expense");
-    setSubcategory("");
     setError("");
   }
 
@@ -71,7 +67,6 @@ export default function CategoriesManager({ categories, onChange }: Props) {
       subcategories: [],
     };
     onChange([...categories, created]);
-    setSelectedId(created.id);
     resetForm();
   }
 
@@ -110,19 +105,20 @@ export default function CategoriesManager({ categories, onChange }: Props) {
     if (editingCategoryId === category.id) setEditingCategoryId(null);
   }
 
-  function addSubcategory() {
-    const clean = subcategory.trim();
-    if (!selected || !clean) return;
-    if (selected.subcategories.some((item) => item.toLocaleLowerCase("pt-BR") === clean.toLocaleLowerCase("pt-BR"))) {
+  function addSubcategory(categoryId: string) {
+    const clean = (subcategoryDrafts[categoryId] ?? "").trim();
+    const category = categories.find((item) => item.id === categoryId);
+    if (!category || !clean) return;
+    if (category.subcategories.some((item) => item.toLocaleLowerCase("pt-BR") === clean.toLocaleLowerCase("pt-BR"))) {
       setError("Essa subcategoria já existe nesta categoria.");
       return;
     }
-    onChange(categories.map((category) =>
-      category.id === selected.id
-        ? { ...category, subcategories: [...category.subcategories, clean] }
-        : category
+    onChange(categories.map((item) =>
+      item.id === categoryId
+        ? { ...item, subcategories: [...item.subcategories, clean] }
+        : item
     ));
-    setSubcategory("");
+    setSubcategoryDrafts((drafts) => ({ ...drafts, [categoryId]: "" }));
     setError("");
   }
 
@@ -165,14 +161,13 @@ export default function CategoriesManager({ categories, onChange }: Props) {
     setError("");
   }
 
-  function removeSubcategory(value: string) {
-    if (!selected) return;
+  function removeSubcategory(categoryId: string, value: string) {
     onChange(categories.map((category) =>
-      category.id === selected.id
+      category.id === categoryId
         ? { ...category, subcategories: category.subcategories.filter((item) => item !== value) }
         : category
     ));
-    if (editingSubcategory?.categoryId === selected.id && editingSubcategory.originalName === value) {
+    if (editingSubcategory?.categoryId === categoryId && editingSubcategory.originalName === value) {
       setEditingSubcategory(null);
     }
   }
@@ -188,7 +183,7 @@ export default function CategoriesManager({ categories, onChange }: Props) {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6">
         <section className="rounded-3xl border border-white/90 bg-white/65 p-5 shadow-sm backdrop-blur-2xl md:p-6">
           <div className="mb-5">
             <h3 className="font-semibold text-[#26364D]">Nova categoria</h3>
@@ -236,7 +231,7 @@ export default function CategoriesManager({ categories, onChange }: Props) {
                           </div>
                         </div>
                       ) : (
-                        <button onClick={() => { setSelectedId(category.id); setError(""); }} className="min-w-0 flex-1 text-left">
+                        <button onClick={() => setError("")} className="min-w-0 flex-1 text-left">
                           <span className="block truncate text-sm font-semibold text-[#354B68]">{category.name}</span>
                           <span className={`mt-1 inline-flex rounded-full px-2 py-1 text-[10px] font-medium ${typeStyles[category.type]}`}>{typeLabels[category.type]}</span>
                         </button>
@@ -248,77 +243,52 @@ export default function CategoriesManager({ categories, onChange }: Props) {
                         </>
                       )}
                     </div>
-                    {category.subcategories.length > 0 ? (
-                      <div className="ml-2 mt-3 space-y-1 border-l-2 border-[#DCE5EF] pl-3">
-                        {category.subcategories.map((item) => (
-                          <button key={item} onClick={() => setSelectedId(category.id)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-[#71839A] hover:bg-white/80">
-                            <span className="text-[#A4B3C5]">↳</span>
-                            <span>{item}</span>
-                          </button>
-                        ))}
+                    <div className="ml-2 mt-3 space-y-2 border-l-2 border-[#DCE5EF] pl-3">
+                      {category.subcategories.length > 0 ? category.subcategories.map((item) => (
+                        <div key={item} className="flex items-center gap-2 rounded-lg px-2 py-1.5">
+                          <span className="text-xs text-[#A4B3C5]">↳</span>
+                          {editingSubcategory?.categoryId === category.id && editingSubcategory.originalName === item ? (
+                            <div className="min-w-0 flex-1 space-y-2">
+                              <input
+                                autoFocus
+                                value={editingSubcategoryName}
+                                onChange={(event) => { setEditingSubcategoryName(event.target.value); setError(""); }}
+                                onKeyDown={(event) => { if (event.key === "Enter") saveSubcategoryName(); if (event.key === "Escape") { setEditingSubcategory(null); setError(""); } }}
+                                className="w-full rounded-lg border border-[#B8C9DC] bg-white px-3 py-2 text-sm text-[#52627A] outline-none focus:border-[#7898BF]"
+                              />
+                              {error && <p className="text-xs text-rose-600">{error}</p>}
+                              <div className="flex gap-2">
+                                <button onClick={saveSubcategoryName} className="rounded-lg bg-[#294263] px-3 py-1.5 text-xs font-medium text-white">Salvar</button>
+                                <button onClick={() => { setEditingSubcategory(null); setError(""); }} className="rounded-lg border border-[#DCE5EF] bg-white px-3 py-1.5 text-xs text-[#64748B]">Cancelar</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <span className="min-w-0 flex-1 text-sm text-[#52627A]">{item}</span>
+                              <button onClick={() => startEditingSubcategory(category.id, item)} className="rounded-lg border border-[#DCE5EF] bg-white/80 px-3 py-1.5 text-xs font-medium text-[#526B8B] hover:bg-white">✎ Editar</button>
+                              <button onClick={() => removeSubcategory(category.id, item)} className="rounded-lg px-2 py-1.5 text-xs text-rose-500 hover:bg-rose-50">Excluir</button>
+                            </>
+                          )}
+                        </div>
+                      )) : (
+                        <p className="px-2 py-1 text-[11px] text-[#A0ACBA]">Nenhuma subcategoria cadastrada</p>
+                      )}
+                      <div className="flex gap-2 px-2 pt-1">
+                        <input
+                          value={subcategoryDrafts[category.id] ?? ""}
+                          onChange={(event) => { setSubcategoryDrafts((drafts) => ({ ...drafts, [category.id]: event.target.value })); setError(""); }}
+                          onKeyDown={(event) => { if (event.key === "Enter") addSubcategory(category.id); }}
+                          placeholder="Nova subcategoria"
+                          className="min-w-0 flex-1 rounded-lg border border-[#E2E8F0] bg-white/80 px-3 py-2 text-xs outline-none focus:border-[#7898BF]"
+                        />
+                        <button onClick={() => addSubcategory(category.id)} className="rounded-lg bg-[#294263] px-3 py-2 text-xs font-medium text-white hover:bg-[#203653]">Adicionar</button>
                       </div>
-                    ) : (
-                      <p className="ml-2 mt-2 text-[11px] text-[#A0ACBA]">Nenhuma subcategoria cadastrada</p>
-                    )}
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
-        </section>
-
-        <section className="rounded-3xl border border-white/90 bg-white/65 p-5 shadow-sm backdrop-blur-2xl md:p-6">
-          <h3 className="font-semibold text-[#26364D]">Subcategorias</h3>
-          <p className="mt-1 text-xs text-[#94A0AF]">Selecione uma categoria para gerenciar suas subdivisões.</p>
-          {!selected ? (
-            <div className="flex min-h-64 flex-col items-center justify-center text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#E7EEF7] text-2xl text-[#526F96]">⌁</div>
-              <p className="mt-4 text-sm font-medium text-[#52627A]">Nenhuma categoria selecionada</p>
-              <p className="mt-1 max-w-xs text-xs leading-5 text-[#94A0AF]">Escolha uma categoria na lista ao lado para adicionar ou remover subcategorias.</p>
-            </div>
-          ) : (
-            <>
-              <div className="mt-5 rounded-2xl bg-[#EDF4FC] p-4">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-[#7890AD]">Categoria selecionada</p>
-                <p className="mt-1 font-semibold text-[#354B68]">{selected.name}</p>
-              </div>
-              <div className="mt-5 flex gap-2">
-                <input value={subcategory} onChange={(event) => setSubcategory(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addSubcategory(); }} placeholder="Nova subcategoria" className="min-w-0 flex-1 rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#7898BF]" />
-                <button onClick={addSubcategory} className="rounded-xl bg-[#294263] px-4 py-3 text-sm font-medium text-white hover:bg-[#203653]">Adicionar</button>
-              </div>
-              {error && !editingCategoryId && !editingSubcategory && <p className="mt-3 text-xs text-rose-600">{error}</p>}
-              <div className="mt-5 space-y-2">
-                {selected.subcategories.length === 0 ? <p className="py-8 text-center text-sm text-[#94A0AF]">Ainda não há subcategorias.</p> : selected.subcategories.map((item) => (
-                  <div key={item} className="flex items-center justify-between gap-3 rounded-xl border border-[#E9EEF4] bg-white/55 px-4 py-3">
-                    {editingSubcategory?.categoryId === selected.id && editingSubcategory.originalName === item ? (
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <input
-                          autoFocus
-                          value={editingSubcategoryName}
-                          onChange={(event) => { setEditingSubcategoryName(event.target.value); setError(""); }}
-                          onKeyDown={(event) => { if (event.key === "Enter") saveSubcategoryName(); if (event.key === "Escape") setEditingSubcategory(null); }}
-                          className="w-full rounded-lg border border-[#B8C9DC] bg-white px-3 py-2 text-sm text-[#52627A] outline-none focus:border-[#7898BF]"
-                        />
-                        {error && <p className="text-xs text-rose-600">{error}</p>}
-                        <div className="flex gap-2">
-                          <button onClick={saveSubcategoryName} className="rounded-lg bg-[#294263] px-3 py-1.5 text-xs font-medium text-white">Salvar</button>
-                          <button onClick={() => { setEditingSubcategory(null); setError(""); }} className="rounded-lg border border-[#DCE5EF] bg-white px-3 py-1.5 text-xs text-[#64748B]">Cancelar</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <span className="min-w-0 flex-1 text-sm text-[#52627A]">{item}</span>
-                        <div className="flex shrink-0 items-center gap-3">
-                          <button onClick={() => startEditingSubcategory(selected.id, item)} className="text-xs text-[#526B8B] hover:text-[#294263]">Editar</button>
-                          <button onClick={() => removeSubcategory(item)} className="text-xs text-rose-500 hover:text-rose-700">Remover</button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
         </section>
       </div>
     </div>
