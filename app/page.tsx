@@ -1235,7 +1235,11 @@ export default function Home() {
         {/* OUTROS MÓDULOS */}
         {/* ================================== */}
 
-        {active === "Categorias" && (\n          <CategoriesManager categories={categories} onChange={setCategories} />\n        )}\n\n        {![ "Visão geral", "Contas", "Lançamentos", "Categorias" ].includes(active) && (
+        {active === "Categorias" && (
+          <CategoriesManager categories={categories} onChange={setCategories} />
+        )}
+
+        {!["Visão geral", "Contas", "Lançamentos", "Categorias"].includes(active) && (
           <div className="flex min-h-[420px] flex-col items-center justify-center rounded-3xl border border-white/90 bg-white/55 p-8 text-center shadow-sm backdrop-blur-2xl">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7EEF7] text-3xl text-[#526F96]">✧</div>
             <h3 className="mt-5 text-xl font-semibold text-[#263D59]">{active}</h3>
