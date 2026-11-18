@@ -115,6 +115,7 @@ export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
   const [transactions, setTransactions] =
     useState<Transaction[]>(initialTransactions);
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
 
   const [selectedAccount, setSelectedAccount] =
     useState<Account | null>(null);
@@ -307,8 +308,9 @@ export default function Home() {
     setTransferDestination(
       String(accounts[1]?.id ?? accounts[0]?.id ?? "")
     );
-    setTransactionGroup("Moradia");
-    setTransactionSubcategory("Aluguel");
+    const firstExpense = categories.find((category) => category.type === "expense");
+    setTransactionGroup(firstExpense?.name || "");
+    setTransactionSubcategory(firstExpense?.subcategories[0] || "");
     setPaidFor("");
     setTransactionError("");
   }
@@ -317,16 +319,9 @@ export default function Home() {
     setTransactionType(type);
     setTransactionError("");
 
-    if (type === "income") {
-      setTransactionGroup("Salário");
-      setTransactionSubcategory("Salário CLT");
-    } else if (type === "expense") {
-      setTransactionGroup("Moradia");
-      setTransactionSubcategory("Aluguel");
-    } else {
-      setTransactionGroup("Transferência");
-      setTransactionSubcategory("Entre contas");
-    }
+    const firstCategory = categories.find((category) => category.type === type);
+    setTransactionGroup(firstCategory?.name || "");
+    setTransactionSubcategory(firstCategory?.subcategories[0] || "");
   }
 
   function saveTransaction() {
@@ -1240,7 +1235,7 @@ export default function Home() {
         {/* OUTROS MÓDULOS */}
         {/* ================================== */}
 
-        {active === "Categorias" && (\n          <CategoriesManager categories={categories} onChange={setCategories} />\n        )}\n\n        {!["Visão geral", "Contas", "Lançamentos", "Categorias"].includes(active) && (
+        {active === "Categorias" && (\n          <CategoriesManager categories={categories} onChange={setCategories} />\n        )}\n\n        {![ "Visão geral", "Contas", "Lançamentos", "Categorias" ].includes(active) && (
           <div className="flex min-h-[420px] flex-col items-center justify-center rounded-3xl border border-white/90 bg-white/55 p-8 text-center shadow-sm backdrop-blur-2xl">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7EEF7] text-3xl text-[#526F96]">✧</div>
             <h3 className="mt-5 text-xl font-semibold text-[#263D59]">{active}</h3>
