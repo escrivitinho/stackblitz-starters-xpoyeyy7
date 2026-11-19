@@ -72,7 +72,7 @@ function parseOfx(raw: string): OfxEntry[] {
   return entries;
 }
 
-export default function DriveSettings({ transactions, accounts, categories, onImport }: { transactions: Transaction[]; accounts: Array<{ id: number; name: string }>; categories: Category[]; onImport: (items: Transaction[]) => void }) {
+export default function DriveSettings({ transactions, accounts, categories, onImport, onPending }: { transactions: Transaction[]; accounts: Array<{ id: number; name: string }>; categories: Category[]; onImport: (items: Transaction[]) => void; onPending: (items: Transaction[]) => void }) {
   const [sdkReady, setSdkReady] = useState(false);
   const [connected, setConnected] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -341,6 +341,7 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
     let ignored = 0;
     let reviewed = 0;
     const staged: Transaction[] = [];
+    const pending: Transaction[] = [];
     const skippedFiles: string[] = [];
     const normalizeText = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
     const keyFor = (date: string, type: string, amountCents: number, description: string, accountId: number) =>
@@ -381,9 +382,14 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
           const idKey = entry.fitid ? account.id + "|" + entry.fitid : "";
           const detailKey = keyFor(date, type, amountCents, entry.description, account.id);
           if (idKey && knownIds.has(idKey)) { ignored++; continue; }
-          if (knownDetails.has(detailKey)) { reviewed++; continue; }
-          if (!entry.fitid) { reviewed++; continue; }
+          const possibleDuplicate = knownDetails.has(detailKey);
+          const missingFitid = !entry.fitid;
           const category = categories.find((item) => item.type === type && item.name === "Outros") || categories.find((item) => item.type === type);
+          if (possibleDuplicate || missingFitid) {
+            reviewed++;
+            pending.push({ id: 0, date, type, accountId: account.id, amountCents, description: entry.description, group: category?.name || "Outros", subcategory: category?.subcategories[0]?.name || "Outros", categoryId: category?.id, subcategoryId: category?.subcategories[0]?.id, source: "ofx", externalId: entry.fitid || undefined, importHash: file.id + ":" + (entry.fitid || detailKey) });
+            continue;
+          }
           staged.push({
             id: 0, date, type, accountId: account.id, amountCents,
             description: entry.description, group: category?.name || "Outros",
@@ -399,8 +405,9 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
         const firstId = Math.max(Date.now(), ...transactions.map((item) => item.id + 1));
         onImport(staged.map((item, index) => ({ ...item, id: firstId + index })));
       }
+      if (pending.length) onPending(pending.map((item, index) => ({ ...item, id: Date.now() + staged.length + index + 1000 })));
       setSyncSkippedFiles(skippedFiles);
-      setSyncSummary(staged.length + " movimentações importadas · " + ignored + " já importadas · " + reviewed + " separadas para revisão · " + skippedFiles.length + " arquivos não processados.");
+      setSyncSummary(staged.length + " movimentações importadas · " + ignored + " já importadas · " + reviewed + " enviadas para Pendentes verificação · " + skippedFiles.length + " arquivos não processados.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Falha na sincronização. Nada foi importado.");
     } finally {
