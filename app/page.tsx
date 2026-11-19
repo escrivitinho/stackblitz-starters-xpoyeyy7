@@ -164,21 +164,32 @@ export default function Home() {
   const [transactionTab, setTransactionTab] = useState<"all" | "pending" | "transfers">("all");
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "income" | "expense">("all");
   const [transactionMonthFilter, setTransactionMonthFilter] = useState("");
-  const [showTransferSuggestions, setShowTransferSuggestions] = useState(false);
+  const [rejectedTransferPairs, setRejectedTransferPairs] = useState<string[]>([]);
+  const transferPairKey = (a: number, b: number) => [a, b].sort((x, y) => x - y).join(":");
+  function confirmTransferPair(outgoingId: number, incomingId: number) {
+    if (!window.confirm("Confirmar que esta saída e entrada são uma transferência entre suas próprias contas? Os registros serão preservados, mas deixarão de contar como receita e despesa.")) return;
+    const pairId = "internal:" + transferPairKey(outgoingId, incomingId);
+    setTransactions((current) => current.map((item) =>
+      item.id === outgoingId || item.id === incomingId ? { ...item, internalTransferPairId: pairId } : item
+    ));
+  }
+  function rejectTransferPair(outgoingId: number, incomingId: number) {
+    setRejectedTransferPairs((current) => [...current, transferPairKey(outgoingId, incomingId)]);
+  }
   const transferSuggestions = transactions
-    .filter((item) => item.type === "expense" && /transfer[eê]ncia|\bpix\b|ted|doc/i.test(item.description))
+    .filter((item) => item.type === "expense" && !item.internalTransferPairId && /transfer[eê]ncia|\bpix\b|ted|doc/i.test(item.description))
     .flatMap((outgoing) => {
       if (outgoing.type !== "expense") return [];
       const candidates = transactions.filter((incoming) =>
-        incoming.type === "income" && incoming.accountId !== outgoing.accountId &&
+        incoming.type === "income" && !incoming.internalTransferPairId && incoming.accountId !== outgoing.accountId &&
         incoming.amountCents === outgoing.amountCents &&
         Math.abs(Date.parse(incoming.date + "T12:00:00Z") - Date.parse(outgoing.date + "T12:00:00Z")) <= 3 * 86400000 &&
         /transfer[eê]ncia|\bpix\b|ted|doc/i.test(incoming.description)
       );
       return candidates.length === 1 && candidates[0].type === "income" ? [{ outgoing, incoming: candidates[0] }] : [];
     })
-    .filter(({ incoming }) => transactions.filter((item) =>
-      item.type === "expense" && item.accountId !== incoming.accountId &&
+    .filter(({ outgoing, incoming }) => !rejectedTransferPairs.includes(transferPairKey(outgoing.id, incoming.id)) && transactions.filter((item) =>
+      item.type === "expense" && !item.internalTransferPairId && item.accountId !== incoming.accountId &&
       item.amountCents === incoming.amountCents &&
       Math.abs(Date.parse(item.date + "T12:00:00Z") - Date.parse(incoming.date + "T12:00:00Z")) <= 3 * 86400000 &&
       /transfer[eê]ncia|\bpix\b|ted|doc/i.test(item.description)
@@ -230,6 +241,7 @@ export default function Home() {
           if (Array.isArray(stored.accounts)) setAccounts(stored.accounts as Account[]);
           if (Array.isArray(stored.cardEntries)) setCardEntries(stored.cardEntries as CardEntry[]);
           if (Array.isArray(stored.pendingTransactions)) setPendingTransactions(stored.pendingTransactions as Transaction[]);
+           if (Array.isArray(stored.rejectedTransferPairs)) setRejectedTransferPairs(stored.rejectedTransferPairs as string[]);
           const loadedCategories = Array.isArray(stored.categories)
             ? normalizeCategories(stored.categories as Category[])
             : initialCategories;
@@ -251,12 +263,12 @@ export default function Home() {
     try {
       window.localStorage.setItem(
         "moneo-finance-v1",
-        JSON.stringify({ accounts, transactions, categories, cardEntries, pendingTransactions })
+        JSON.stringify({ accounts, transactions, categories, cardEntries, pendingTransactions, rejectedTransferPairs })
       );
     } catch (error) {
       console.error("Não foi possível salvar os dados locais do MONEO.", error);
     }
-  }, [accounts, transactions, categories, cardEntries, pendingTransactions, storageLoaded]);
+  }, [accounts, transactions, categories, cardEntries, pendingTransactions, rejectedTransferPairs, storageLoaded]);
 
 
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
@@ -1295,22 +1307,24 @@ if (amountCents <= 0) {
               </div>
             </div>}
             {transactionTab === "transfers" && <div className="rounded-3xl border border-white/90 bg-white/65 p-4 shadow-sm backdrop-blur-2xl md:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div><h3 className="text-sm font-semibold text-[#26364D]">Possíveis transferências entre contas</h3>
-                  <p className="mt-1 text-xs text-[#64748B]">Identificamos {transferSuggestions.length} par(es) com valores iguais, contas diferentes e datas próximas. Nenhum lançamento foi alterado.</p></div>
-                <button type="button" onClick={() => setShowTransferSuggestions((current) => !current)} className="rounded-xl border border-sky-200 bg-sky-100/80 px-4 py-2 text-xs font-semibold text-sky-900">{showTransferSuggestions ? "Ocultar sugestões" : "Conferir sugestões"}</button>
-              </div>
-              {showTransferSuggestions && <div className="mt-4 space-y-3">
-                {transferSuggestions.length === 0 ? <p className="text-xs text-[#64748B]">Nenhum par seguro encontrado com esses critérios. Isso não significa que não existam transferências.</p> :
-                  transferSuggestions.map(({ outgoing, incoming }) => <div key={String(outgoing.id) + ":" + String(incoming.id)} className="rounded-2xl border border-[#E2E8F0] bg-white/75 p-4">
-                    <p className="text-sm font-semibold text-[#26364D]">{money(outgoing.amountCents)} · possível transferência</p>
-                    <p className="mt-2 break-words text-xs text-[#64748B]">Saída: {displayDate(outgoing.date)} · {accounts.find((account) => account.id === outgoing.accountId)?.name || "Conta desconhecida"} · {outgoing.description}</p>
-                    <p className="mt-2 break-words text-xs text-[#64748B]">Entrada: {displayDate(incoming.date)} · {accounts.find((account) => account.id === incoming.accountId)?.name || "Conta desconhecida"} · {incoming.description}</p>
-                    <p className="mt-2 text-xs text-amber-700">Sugestão para conferência: pode envolver terceiros. Não afeta os totais até confirmarmos a origem e o destino.</p>
+              <h3 className="text-sm font-semibold text-[#26364D]">Possíveis transferências entre contas</h3>
+              <p className="mt-1 text-xs text-[#64748B]">{transferSuggestions.length} par(es) aguardando sua decisão. Confirme apenas movimentações entre suas próprias contas.</p>
+              <div className="mt-4 space-y-3">
+                {transferSuggestions.length === 0 ? <p className="text-sm text-[#64748B]">Nenhuma sugestão pendente de análise.</p> :
+                  transferSuggestions.map(({ outgoing, incoming }) => <div key={String(outgoing.id) + ":" + String(incoming.id)} className="flex flex-col gap-3 rounded-2xl border border-[#E2E8F0] bg-white/75 p-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-amber-700">{money(outgoing.amountCents)} · possível transferência</p>
+                      <p className="mt-2 break-words text-xs text-[#64748B]"><span className="font-semibold text-rose-600">Saída:</span> {displayDate(outgoing.date)} · {accounts.find((account) => account.id === outgoing.accountId)?.name || "Conta desconhecida"} · {outgoing.description}</p>
+                      <p className="mt-2 break-words text-xs text-[#64748B]"><span className="font-semibold text-emerald-600">Entrada:</span> {displayDate(incoming.date)} · {accounts.find((account) => account.id === incoming.accountId)?.name || "Conta desconhecida"} · {incoming.description}</p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <button type="button" onClick={() => confirmTransferPair(outgoing.id, incoming.id)} className="rounded-xl bg-amber-400 px-4 py-2.5 text-xs font-semibold text-amber-950 hover:bg-amber-300">Confirmar transferência</button>
+                      <button type="button" onClick={() => rejectTransferPair(outgoing.id, incoming.id)} className="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-rose-500">Não é transferência</button>
+                    </div>
                   </div>)}
-              </div>}
+              </div>
             </div>}
-            {transactionTab === "all" && <>
+                        {transactionTab === "all" && <>
             {/* LISTA */}
             <div className="rounded-3xl border border-white/90 bg-white/65 p-5 shadow-[0_8px_32px_rgba(80,110,150,0.07)] backdrop-blur-2xl md:p-6">
               <div className="mb-5">
