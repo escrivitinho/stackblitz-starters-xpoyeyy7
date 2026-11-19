@@ -203,7 +203,7 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
     setAuditResults(null);
     try {
       const output: FileResult[] = [];
-      async function collectFiles(folderId: string, folderPath: string, format: string, depth: number): Promise<void> {
+      const collectFiles = async (folderId: string, folderPath: string, format: string, depth: number): Promise<void> => {
         let pageToken: string | undefined;
         do {
           const params = new URLSearchParams({
@@ -231,7 +231,7 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
           }
           pageToken = data.nextPageToken;
         } while (pageToken);
-      }
+      };
       for (const folder of folders) {
         const found = results.find((item) => item.path === folder.path);
         if (!found?.id || found.status !== "found") continue;
