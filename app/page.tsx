@@ -9,35 +9,44 @@ import {
   type Transaction,
   type TransactionType,
 } from "./transactions";
+import {
+  calculateAccountBalance,
+  calculateTotalBalance,
+} from "./account-balances";
 
 type Account = {
   id: number;
   name: string;
   type: string;
-  balanceCents: number | null;
+  openingBalanceCents: number | null;
+  openingBalanceDate: string | null;
   source: "manual" | "statement" | "pending";
 };
+
 
 const initialAccounts: Account[] = [
   {
     id: 1,
     name: "Nubank",
     type: "Conta corrente",
-    balanceCents: 123456,
+    openingBalanceCents: 123456,
+    openingBalanceDate: "2026-01-01",
     source: "manual",
   },
   {
     id: 2,
     name: "Inter",
     type: "Conta corrente",
-    balanceCents: null,
+    openingBalanceCents: null,
+    openingBalanceDate: null,
     source: "pending",
   },
   {
     id: 3,
     name: "Caixa",
     type: "Conta corrente",
-    balanceCents: null,
+    openingBalanceCents: null,
+    openingBalanceDate: null,
     source: "pending",
   },
 ];
@@ -148,14 +157,18 @@ export default function Home() {
   const [paidFor, setPaidFor] = useState("");
   const [transactionError, setTransactionError] = useState("");
 
-  const totalBalanceCents = accounts.reduce(
-    (total, account) => total + (account.balanceCents ?? 0),
-    0
-  );
 
-  const accountsWithBalance = accounts.filter(
-    (account) => account.balanceCents !== null
-  ).length;
+const totalBalanceCents = calculateTotalBalance(
+  accounts,
+  transactions
+);
+
+const accountsWithBalance = accounts.filter(
+  (account) =>
+    account.openingBalanceCents !== null &&
+    account.openingBalanceDate !== null
+).length;
+
 
   const totals = calculateTransactionTotals(transactions);
 
@@ -197,8 +210,7 @@ export default function Home() {
       return;
     }
 
-    let balanceCents: number | null = null;
-
+let openingBalanceCents: number | null = null;
     if (balanceMethod === "manual") {
       if (!initialBalance.trim()) {
         setAccountError("Informe o saldo inicial da conta.");
@@ -206,7 +218,7 @@ export default function Home() {
       }
 
      try {
-  balanceCents = parseMoneyToCents(initialBalance);
+openingBalanceCents = parseMoneyToCents(initialBalance);
 } catch (error) {
   setAccountError(
     error instanceof Error
@@ -221,14 +233,20 @@ export default function Home() {
       (account) => account.id === editingId
     );
 
-    const newAccount: Account = {
-      id: editingId ?? Date.now(),
-      name: accountName.trim(),
-      type: accountType,
-      balanceCents,
-      source:
-        balanceMethod === "manual" ? "manual" : "pending",
-    };
+  
+const newAccount: Account = {
+  id: editingId ?? Date.now(),
+  name: accountName.trim(),
+  type: accountType,
+  openingBalanceCents,
+  openingBalanceDate:
+    openingBalanceCents !== null
+      ? new Date().toLocaleDateString("en-CA")
+      : null,
+  source:
+    balanceMethod === "manual" ? "manual" : "pending",
+};
+
 
     if (editingId !== null) {
       setAccounts((current) =>
