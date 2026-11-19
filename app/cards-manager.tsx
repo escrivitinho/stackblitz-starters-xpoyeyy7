@@ -42,7 +42,7 @@ function findSuggestion(entry: CardEntry, entries: CardEntry[], categories: Cate
     const prior = counts.get(key);
     counts.set(key, { count: (prior?.count ?? 0) + 1, categoryId: match.categoryId!, subcategoryId: match.subcategoryId });
   }
-  const ranked = [...counts.values()].sort((a, b) => b.count - a.count);
+  const ranked = Array.from(counts.values()).sort((a, b) => b.count - a.count);
   if (ranked.length > 1 && ranked[0].count === ranked[1].count) return null;
   return ranked[0];
 }
