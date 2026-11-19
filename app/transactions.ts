@@ -10,6 +10,8 @@ type TransactionBase = {
   description: string;
   group: string;
   subcategory: string;
+  categoryId?: string;
+  subcategoryId?: string;
   paidFor?: string;
   source: TransactionSource;
   externalId?: string;
