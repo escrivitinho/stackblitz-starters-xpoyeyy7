@@ -1073,7 +1073,7 @@ if (amountCents <= 0) {
                       onChange={(e) => { setTransactionDate(e.target.value); setInvoiceCompetenceOverride(""); }}
                       className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF]"
                     />
-                  </label>
+                  </label>}
                   {transactionType === "transfer" ? (
                     <label className="space-y-2 md:col-span-2">
                       <span className="text-xs font-medium text-[#64748B]">Conta de destino</span>
