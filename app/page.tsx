@@ -1318,8 +1318,8 @@ if (amountCents <= 0) {
                       <p className="mt-2 break-words text-xs text-[#64748B]"><span className="font-semibold text-emerald-600">Entrada:</span> {displayDate(incoming.date)} · {accounts.find((account) => account.id === incoming.accountId)?.name || "Conta desconhecida"} · {incoming.description}</p>
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
-                      <button type="button" onClick={() => confirmTransferPair(outgoing.id, incoming.id)} className="rounded-xl bg-amber-400 px-4 py-2.5 text-xs font-semibold text-amber-950 hover:bg-amber-300">Confirmar transferência</button>
-                      <button type="button" onClick={() => rejectTransferPair(outgoing.id, incoming.id)} className="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-rose-500">Não é transferência</button>
+                      <button type="button" onClick={() => confirmTransferPair(outgoing.id, incoming.id)} className="rounded-xl border border-amber-300/80 bg-amber-300/45 px-4 py-2.5 text-xs font-semibold text-amber-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_4px_16px_rgba(245,158,11,0.12)] backdrop-blur-xl transition-all hover:bg-amber-300/65">Confirmar transferência</button>
+                      <button type="button" onClick={() => rejectTransferPair(outgoing.id, incoming.id)} className="rounded-xl border border-rose-300/80 bg-rose-300/35 px-4 py-2.5 text-xs font-semibold text-rose-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_4px_16px_rgba(244,63,94,0.10)] backdrop-blur-xl transition-all hover:bg-rose-300/55">Não é transferência</button>
                     </div>
                   </div>)}
               </div>
@@ -1342,7 +1342,7 @@ if (amountCents <= 0) {
                       <button key={filter} type="button" onClick={() => setTransactionTypeFilter(filter)}
                         aria-pressed={transactionTypeFilter === filter}
                         className={`rounded-2xl border px-4 py-2.5 text-sm font-semibold backdrop-blur-xl transition-all ${transactionTypeFilter === filter
-                          ? filter === "income" ? "border-emerald-500 bg-emerald-500 text-white shadow-sm" : filter === "expense" ? "border-rose-500 bg-rose-500 text-white shadow-sm" : "border-slate-300 bg-white/90 text-[#35445A] shadow-sm"
+                          ? filter === "income" ? "border-emerald-300/80 bg-emerald-300/45 text-emerald-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]" : filter === "expense" ? "border-rose-300/80 bg-rose-300/45 text-rose-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]" : "border-slate-300 bg-white/90 text-[#35445A] shadow-sm"
                           : "border-white/90 bg-white/55 text-[#64748B] hover:bg-white/85"}`}>{label}</button>
                     ))}
                   </div>
