@@ -21,10 +21,7 @@ export function parseMoneyToCents(value: string): number {
   if (!Number.isSafeInteger(valueInCents)) {
     throw new Error("O valor informado é muito alto.");
   }
-
-  return valueInCents;
-}
-
+return valueInCents === 0 ? 0 : valueInCents;}
 export function formatCents(cents: number): string {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",

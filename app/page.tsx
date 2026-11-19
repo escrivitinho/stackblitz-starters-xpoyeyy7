@@ -205,16 +205,16 @@ export default function Home() {
         return;
       }
 
-      const parsed = parseMoneyToCents(initialBalance);
-
-      if (parsed === null) {
-        setAccountError(
-          "Valor inválido. Use formatos como 1500,00 ou 1.500,00."
-        );
-        return;
-      }
-
-      balanceCents = parsed;
+     try {
+  balanceCents = parseMoneyToCents(initialBalance);
+} catch (error) {
+  setAccountError(
+    error instanceof Error
+      ? error.message
+      : "Não foi possível validar o saldo inicial."
+  );
+  return;
+}
     }
 
     const existingAccount = accounts.find(
@@ -341,14 +341,25 @@ export default function Home() {
       return;
     }
 
-    const amountCents = parseMoneyToCents(transactionAmount);
+    let amountCents: number;
 
-    if (amountCents === null || amountCents <= 0) {
-      setTransactionError(
-        "Informe um valor válido e maior que zero. Ex.: 150,00."
-      );
-      return;
-    }
+try {
+  amountCents = parseMoneyToCents(transactionAmount);
+} catch (error) {
+  setTransactionError(
+    error instanceof Error
+      ? error.message
+      : "Não foi possível validar o valor informado."
+  );
+  return;
+}
+
+if (amountCents <= 0) {
+  setTransactionError(
+    "Informe um valor maior que zero. Ex.: 150,00."
+  );
+  return;
+}
 
     const accountId = Number(transactionAccount);
 
