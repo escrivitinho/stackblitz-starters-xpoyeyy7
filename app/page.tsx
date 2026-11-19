@@ -68,6 +68,10 @@ const initialCategories: Category[] = [
 ];
 
 function money(cents: number | null) {
+  if (cents === null) {
+    return "Aguardando saldo inicial";
+  }
+
   return formatCents(cents);
 }
 
