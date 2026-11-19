@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import CategoriesManager, { type Category } from "./categories-manager";
+import CardsManager, { type CardEntry } from "./cards-manager";
 import { formatCents, parseMoneyToCents } from "./lib/money";
 import {
   calculateTransactionTotals,
@@ -157,6 +158,7 @@ export default function Home() {
   const [transactions, setTransactions] =
     useState<Transaction[]>(initialTransactions);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const [cardEntries, setCardEntries] = useState<CardEntry[]>([]);
   // Persistência local: carregar após a hidratação e só salvar depois da leitura.
   const [storageLoaded, setStorageLoaded] = useState(false);
   const [backupMessage, setBackupMessage] = useState("");
@@ -170,6 +172,7 @@ export default function Home() {
         if (data && typeof data === "object") {
           const stored = data as Record<string, unknown>;
           if (Array.isArray(stored.accounts)) setAccounts(stored.accounts as Account[]);
+          if (Array.isArray(stored.cardEntries)) setCardEntries(stored.cardEntries as CardEntry[]);
           const loadedCategories = Array.isArray(stored.categories)
             ? normalizeCategories(stored.categories as Category[])
             : initialCategories;
@@ -191,12 +194,12 @@ export default function Home() {
     try {
       window.localStorage.setItem(
         "moneo-finance-v1",
-        JSON.stringify({ accounts, transactions, categories })
+        JSON.stringify({ accounts, transactions, categories, cardEntries })
       );
     } catch (error) {
       console.error("Não foi possível salvar os dados locais do MONEO.", error);
     }
-  }, [accounts, transactions, categories, storageLoaded]);
+  }, [accounts, transactions, categories, cardEntries, storageLoaded]);
 
 
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
@@ -260,6 +263,7 @@ const accountsWithBalance = accounts.filter(
       accounts,
       transactions,
       categories,
+      cardEntries,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -319,7 +323,14 @@ const accountsWithBalance = accounts.filter(
             ? typeof t.fromAccountId === "number" && typeof t.toAccountId === "number"
             : typeof t.accountId === "number");
       });
-      if (!validAccounts || !validCategories || !validTransactions) {
+      const validCardEntries = data.cardEntries === undefined || (Array.isArray(data.cardEntries) && data.cardEntries.every((item: unknown) => {
+        if (!item || typeof item !== "object") return false;
+        const c = item as Record<string, unknown>;
+        return typeof c.id === "string" && ["Nubank Crédito", "Inter Crédito"].includes(String(c.card)) &&
+          typeof c.date === "string" && typeof c.description === "string" &&
+          typeof c.amountCents === "number" && Number.isSafeInteger(c.amountCents) && typeof c.importKey === "string";
+      }));
+      if (!validAccounts || !validCategories || !validTransactions || !validCardEntries) {
         throw new Error("O backup contém registros inválidos.");
       }
       if (!window.confirm("Restaurar este backup? Isso substituirá TODAS as contas, categorias e movimentações deste navegador. Faça um backup atual antes de continuar.")) return;
@@ -327,11 +338,12 @@ const accountsWithBalance = accounts.filter(
       const restoredTransactions = migrateTransactions(data.transactions as Transaction[], restoredCategories);
       // Persistir primeiro: evita mostrar dados restaurados se o navegador estiver sem espaço.
       window.localStorage.setItem("moneo-finance-v1", JSON.stringify({
-        accounts: data.accounts, transactions: restoredTransactions, categories: restoredCategories,
+        accounts: data.accounts, transactions: restoredTransactions, categories: restoredCategories, cardEntries: data.cardEntries ?? [],
       }));
       setAccounts(data.accounts as Account[]);
       setCategories(restoredCategories);
       setTransactions(restoredTransactions);
+      setCardEntries((data.cardEntries ?? []) as CardEntry[]);
       setSelectedAccountId(null);
       setBackupMessage("Backup restaurado com sucesso neste navegador.");
     } catch (error) {
@@ -1458,6 +1470,10 @@ if (amountCents <= 0) {
         {/* ================================== */}
         {/* OUTROS MÓDULOS */}
         {/* ================================== */}
+
+        {active === "Cartões" && (
+          <CardsManager entries={cardEntries} onChange={setCardEntries} />
+        )}
 
         {active === "Categorias" && (
           <CategoriesManager
