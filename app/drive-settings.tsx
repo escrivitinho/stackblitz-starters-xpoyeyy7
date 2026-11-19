@@ -19,7 +19,8 @@ const folders = [
 ];
 
 
-type FolderResult = { path: string; status: "found" | "missing" | "ambiguous" };
+type FolderResult = { path: string; status: "found" | "missing" | "ambiguous"; id?: string };
+type FileResult = { id: string; name: string; size?: string; modifiedTime?: string; folderPath: string };
 type DriveItem = { id: string; name: string };
 
 async function findFolder(token: string, parent: string, name: string): Promise<DriveItem[]> {
@@ -50,6 +51,8 @@ export default function DriveSettings() {
   const tokenRef = useRef<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [results, setResults] = useState<FolderResult[] | null>(null);
+  const [files, setFiles] = useState<FileResult[] | null>(null);
+  const [loadingFiles, setLoadingFiles] = useState(false);
 
   useEffect(() => {
     if (window.google?.accounts.oauth2) { setSdkReady(true); return; }
@@ -64,6 +67,7 @@ export default function DriveSettings() {
 
   function connect() {
     setError("");
+    setFiles(null);
     if (!window.google?.accounts.oauth2) { setError("Autenticação Google indisponível."); return; }
     setBusy(true);
     try {
@@ -96,6 +100,7 @@ export default function DriveSettings() {
     tokenRef.current = null;
     setConnected(false);
     setResults(null);
+    setFiles(null);
     if (token && window.google?.accounts.oauth2) window.google.accounts.oauth2.revoke(token, () => {});
   }
 
@@ -106,6 +111,7 @@ export default function DriveSettings() {
     setChecking(true);
     setError("");
     setResults(null);
+    setFiles(null);
     try {
       const cache = new Map<string, DriveItem[]>();
       const output: FolderResult[] = [];
@@ -123,13 +129,56 @@ export default function DriveSettings() {
           if (matches.length > 1) { status = "ambiguous"; break; }
           parent = matches[0].id;
         }
-        output.push({ path: folder.path, status });
+        output.push({ path: folder.path, status, id: status === "found" ? parent : undefined });
       }
       setResults(output);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao localizar pastas.");
     } finally {
       setChecking(false);
+    }
+  }
+
+
+  async function checkFiles() {
+    const token = tokenRef.current;
+    if (!token || !results) return;
+    setLoadingFiles(true);
+    setError("");
+    setFiles(null);
+    try {
+      const output: FileResult[] = [];
+      for (const folder of folders) {
+        const found = results.find((item) => item.path === folder.path);
+        if (!found?.id || found.status !== "found") continue;
+        let pageToken: string | undefined;
+        do {
+          const params = new URLSearchParams({
+            q: "'" + found.id + "' in parents and trashed = false",
+            fields: "nextPageToken,files(id,name,size,modifiedTime,mimeType)",
+            pageSize: "100",
+          });
+          if (pageToken) params.set("pageToken", pageToken);
+          const response = await fetch("https://www.googleapis.com/drive/v3/files?" + params.toString(), {
+            headers: { Authorization: "Bearer " + token },
+            cache: "no-store",
+          });
+          if (!response.ok) throw new Error(response.status === 401 ? "Sua autorização expirou. Reconecte o Google Drive." : "Erro ao listar arquivos (" + response.status + ").");
+          const data = await response.json() as { nextPageToken?: string; files?: Array<{ id: string; name: string; size?: string; modifiedTime?: string; mimeType?: string }> };
+          for (const file of data.files || []) {
+            if (file.mimeType === "application/vnd.google-apps.folder") continue;
+            if (!file.name.toLowerCase().endsWith("." + folder.format.toLowerCase())) continue;
+            output.push({ id: file.id, name: file.name, size: file.size, modifiedTime: file.modifiedTime, folderPath: folder.path });
+          }
+          pageToken = data.nextPageToken;
+        } while (pageToken);
+      }
+      output.sort((a, b) => (b.modifiedTime || "").localeCompare(a.modifiedTime || ""));
+      setFiles(output);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível listar os arquivos.");
+    } finally {
+      setLoadingFiles(false);
     }
   }
 
@@ -151,6 +200,8 @@ export default function DriveSettings() {
         <p className="text-xs text-[#77879B]">A autorização permite leitura de todo o Drive, não apenas das pastas listadas. Nenhum arquivo será importado nesta etapa.</p>
       </div>
       {connected && <div className="mt-4"><button type="button" disabled={checking} onClick={() => void checkFolders()} className="rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white disabled:opacity-50">{checking ? "Procurando pastas..." : "Localizar pastas no Drive"}</button><p className="mt-2 text-xs text-[#77879B]">Consulta apenas nomes e identificadores de pastas. Não lê nem importa arquivos financeiros.</p></div>}
+      {results?.some((item) => item.status === "found") && <div className="mt-4"><button type="button" disabled={checking || loadingFiles} onClick={() => void checkFiles()} className="rounded-xl border border-[#DCE5EF] bg-white/80 px-5 py-3 text-sm font-medium text-[#34383F] disabled:opacity-50">{loadingFiles ? "Verificando arquivos..." : "Verificar arquivos"}</button><p className="mt-2 text-xs text-[#77879B]">Exibe somente metadados de OFX e CSV nas pastas encontradas, sem baixar o conteúdo.</p></div>}
+      {files && <div className="mt-5 rounded-2xl border border-[#E5EAF0] bg-white/70 p-4"><h3 className="text-sm font-semibold text-[#26364D]">Arquivos encontrados ({files.length})</h3>{files.length === 0 ? <p className="mt-3 text-sm text-[#77879B]">Nenhum arquivo OFX ou CSV encontrado nas pastas correspondentes.</p> : <div className="mt-3 max-h-96 space-y-2 overflow-y-auto">{files.map((file) => <div key={file.id} className="border-t border-[#E5EAF0] pt-2"><p className="break-all text-sm font-medium text-[#26364D]">{file.name}</p><p className="text-xs text-[#77879B]">{folders.find((folder) => folder.path === file.folderPath)?.label} · {file.modifiedTime ? new Date(file.modifiedTime).toLocaleDateString("pt-BR") : "Data indisponível"} · {file.size ? (Number(file.size) / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " KB" : "Tamanho indisponível"}</p></div>)}</div>}</div>}
       {error && <p role="alert" className="mt-3 text-sm text-rose-600">{error}</p>}
       {connected && <p role="status" className="mt-3 text-sm text-emerald-700">Autorização recebida nesta sessão. A sincronização ainda não está ativa.</p>}
       <div className="mt-5 rounded-2xl border border-[#E5EAF0] bg-white/70 p-4">
