@@ -1290,7 +1290,7 @@ if (amountCents <= 0) {
                     <div
                       key={transaction.id}
                       onClick={() => startEdit(transaction)}
-                      className="flex cursor-pointer flex-wrap items-center justify-between gap-3 border-b border-[#EDF0F4] py-4 hover:bg-white/60 last:border-0"
+                      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-[#EDF0F4] py-4 hover:bg-white/60 last:border-0"
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
@@ -1316,7 +1316,7 @@ if (amountCents <= 0) {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex shrink-0 items-center justify-end gap-3 whitespace-nowrap">
                         <p className={`whitespace-nowrap text-sm font-semibold ${
                           transaction.type === "income"
                             ? "text-emerald-700"
