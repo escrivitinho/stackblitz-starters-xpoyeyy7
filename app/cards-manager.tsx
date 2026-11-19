@@ -103,7 +103,7 @@ export default function CardsManager({ entries, onChange, categories }: { entrie
   const [cardFilter, setCardFilter] = useState("Todos");
   const [monthFilter, setMonthFilter] = useState("Todos");
   const expenseCategories = categories.filter((category) => category.type === "expense");
-  const months = [...new Set(entries.map((entry) => entry.date.slice(0, 7)))].sort().reverse();
+  const months = Array.from(new Set(entries.map((entry) => entry.date.slice(0, 7)))).sort().reverse();
   const filtered = entries.filter((entry) => (cardFilter === "Todos" || entry.card === cardFilter) && (monthFilter === "Todos" || entry.date.startsWith(monthFilter))).sort((a, b) => b.date.localeCompare(a.date));
   function updateEntry(id: string, changes: Partial<CardEntry>) { onChange(entries.map((entry) => entry.id === id ? { ...entry, ...changes } : entry)); }
   const [preview, setPreview] = useState<Draft[]>([]);
