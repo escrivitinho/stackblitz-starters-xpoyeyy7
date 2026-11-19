@@ -159,6 +159,8 @@ export default function Home() {
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   // Persistência local: carregar após a hidratação e só salvar depois da leitura.
   const [storageLoaded, setStorageLoaded] = useState(false);
+  const [backupMessage, setBackupMessage] = useState("");
+  const [backupError, setBackupError] = useState("");
 
   useEffect(() => {
     try {
@@ -248,6 +250,94 @@ const accountsWithBalance = accounts.filter(
     }, {});
 
   const availableSubcategories = availableGroups[transactionGroup] || [];
+
+  function exportBackup() {
+    if (!storageLoaded) return;
+    const payload = {
+      app: "moneo-finance",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      accounts,
+      transactions,
+      categories,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `moneo-backup-${todayISO()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setBackupError("");
+    setBackupMessage("Backup gerado. Guarde o arquivo em um local seguro.");
+  }
+
+  async function importBackup(file: File | undefined) {
+    if (!file || !storageLoaded) return;
+    setBackupError("");
+    setBackupMessage("");
+    try {
+      if (file.size > 10 * 1024 * 1024) throw new Error("O arquivo excede 10 MB.");
+      const parsed: unknown = JSON.parse(await file.text());
+      if (!parsed || typeof parsed !== "object") throw new Error("Arquivo inválido.");
+      const data = parsed as Record<string, unknown>;
+      if (data.app !== "moneo-finance" || data.version !== 1 ||
+          !Array.isArray(data.accounts) || !Array.isArray(data.transactions) ||
+          !Array.isArray(data.categories)) {
+        throw new Error("Este arquivo não é um backup compatível do MONEO.");
+      }
+      const validAccounts = data.accounts.every((item: unknown) => {
+        if (!item || typeof item !== "object") return false;
+        const a = item as Record<string, unknown>;
+        return typeof a.id === "number" && typeof a.name === "string" &&
+          (a.openingBalanceCents === null || typeof a.openingBalanceCents === "number") &&
+          (a.openingBalanceDate === null || typeof a.openingBalanceDate === "string");
+      });
+      const validCategories = data.categories.every((item: unknown) => {
+        if (!item || typeof item !== "object") return false;
+        const c = item as Record<string, unknown>;
+        return typeof c.id === "string" && typeof c.name === "string" &&
+          ["income", "expense", "transfer"].includes(String(c.type)) &&
+          Array.isArray(c.subcategories) && c.subcategories.every((sub: unknown) =>
+            typeof sub === "string" ||
+            (sub !== null && typeof sub === "object" &&
+              typeof (sub as { id?: unknown }).id === "string" &&
+              typeof (sub as { name?: unknown }).name === "string")
+          );
+      });
+      const validTransactions = data.transactions.every((item: unknown) => {
+        if (!item || typeof item !== "object") return false;
+        const t = item as Record<string, unknown>;
+        return typeof t.id === "number" && typeof t.date === "string" &&
+          typeof t.description === "string" && typeof t.amountCents === "number" &&
+          Number.isFinite(t.amountCents) && t.amountCents >= 0 &&
+          ["income", "expense", "transfer"].includes(String(t.type)) &&
+          typeof t.group === "string" && typeof t.subcategory === "string" &&
+          (t.type === "transfer"
+            ? typeof t.fromAccountId === "number" && typeof t.toAccountId === "number"
+            : typeof t.accountId === "number");
+      });
+      if (!validAccounts || !validCategories || !validTransactions) {
+        throw new Error("O backup contém registros inválidos.");
+      }
+      if (!window.confirm("Restaurar este backup? Isso substituirá TODAS as contas, categorias e movimentações deste navegador. Faça um backup atual antes de continuar.")) return;
+      const restoredCategories = normalizeCategories(data.categories as Category[]);
+      const restoredTransactions = migrateTransactions(data.transactions as Transaction[], restoredCategories);
+      // Persistir primeiro: evita mostrar dados restaurados se o navegador estiver sem espaço.
+      window.localStorage.setItem("moneo-finance-v1", JSON.stringify({
+        accounts: data.accounts, transactions: restoredTransactions, categories: restoredCategories,
+      }));
+      setAccounts(data.accounts as Account[]);
+      setCategories(restoredCategories);
+      setTransactions(restoredTransactions);
+      setSelectedAccountId(null);
+      setBackupMessage("Backup restaurado com sucesso neste navegador.");
+    } catch (error) {
+      setBackupError(error instanceof Error ? error.message : "Não foi possível restaurar o backup.");
+    }
+  }
 
   function goToPage(page: string) {
     setActive(page);
@@ -1378,7 +1468,32 @@ if (amountCents <= 0) {
           />
         )}
 
-        {!["Visão geral", "Contas", "Lançamentos", "Categorias"].includes(active) && (
+        {active === "Configurações" && (
+          <div className="rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm backdrop-blur-2xl">
+            <h2 className="text-xl font-semibold text-[#26364D]">Backup e restauração</h2>
+            <p className="mt-2 text-sm text-[#707780]">Exporte seus dados para levar o MONEO entre navegadores e dispositivos. O arquivo contém informações financeiras pessoais: guarde-o em local seguro.</p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button type="button" disabled={!storageLoaded} onClick={exportBackup}
+                className="rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white disabled:opacity-50">
+                Baixar backup (.json)
+              </button>
+              <label className="cursor-pointer rounded-xl border border-[#DCE5EF] bg-white/80 px-5 py-3 text-sm font-medium text-[#34383F]">
+                Restaurar backup
+                <input type="file" accept=".json,application/json" className="sr-only"
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0];
+                    event.currentTarget.value = "";
+                    void importBackup(file);
+                  }} />
+              </label>
+            </div>
+            <p className="mt-4 text-xs text-[#8A98AA]">A restauração substitui os dados atuais deste navegador. Não há sincronização automática com o GitHub ou StackBlitz.</p>
+            {backupMessage && <p role="status" className="mt-4 text-sm text-emerald-700">{backupMessage}</p>}
+            {backupError && <p role="alert" className="mt-4 text-sm text-rose-600">{backupError}</p>}
+          </div>
+        )}
+
+        {!["Visão geral", "Contas", "Lançamentos", "Categorias", "Configurações"].includes(active) && (
           <div className="flex min-h-[420px] flex-col items-center justify-center rounded-3xl border border-white/90 bg-white/55 p-8 text-center shadow-sm backdrop-blur-2xl">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7EEF7] text-3xl text-[#526F96]">✧</div>
             <h3 className="mt-5 text-xl font-semibold text-[#263D59]">{active}</h3>
