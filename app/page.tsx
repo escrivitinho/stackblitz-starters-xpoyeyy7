@@ -807,6 +807,16 @@ if (amountCents <= 0) {
 
         {active === "Visão geral" && (
           <div className="space-y-5">
+            <div className="flex flex-wrap gap-3">
+              {([["income", "+ Nova receita"], ["expense", "+ Nova despesa"]] as [TransactionType, string][]).map(([type, label]) => (
+                <button key={type} type="button" onClick={() => {
+                  resetTransactionForm();
+                  changeTransactionType(type);
+                  setShowTransactionForm(true);
+                  setActive("Lançamentos");
+                }} className="rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white shadow-sm hover:bg-[#25282D]">{label}</button>
+              ))}
+            </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="group relative isolate overflow-hidden rounded-3xl border border-white/90 bg-white/65 p-6 shadow-[0_8px_32px_rgba(80,110,150,0.10)] backdrop-blur-2xl">
                 <div className="pointer-events-none absolute -right-10 -top-16 -z-10 h-48 w-48 rounded-full bg-sky-200/70 blur-[65px]" />
