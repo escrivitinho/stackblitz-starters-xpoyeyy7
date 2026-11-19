@@ -51,6 +51,34 @@ const initialAccounts: Account[] = [
   },
 ];
 
+function normalizeCategories(value: Category[]): Category[] {
+  return value.map((category) => ({
+    ...category,
+    subcategories: category.subcategories.map((subcategory, index) =>
+      typeof subcategory === "string"
+        ? { id: `${category.id}-legacy-${index}`, name: subcategory }
+        : subcategory
+    ),
+  }));
+}
+
+function migrateTransactions(items: Transaction[], categories: Category[]): Transaction[] {
+  return items.map((transaction) => {
+    const category = categories.find((item) =>
+      item.id === transaction.categoryId ||
+      (item.type === transaction.type && item.name === transaction.group)
+    );
+    const subcategory = category?.subcategories.find((item) =>
+      item.id === transaction.subcategoryId || item.name === transaction.subcategory
+    );
+    return {
+      ...transaction,
+      categoryId: category?.id ?? transaction.categoryId,
+      subcategoryId: subcategory?.id ?? transaction.subcategoryId,
+    };
+  });
+}
+
 const initialTransactions: Transaction[] = [];
 
 const navigation = [
@@ -64,16 +92,16 @@ const navigation = [
 ];
 
 const initialCategories: Category[] = [
-  { id: "expense-housing", name: "Moradia", type: "expense", subcategories: ["Aluguel", "Condomínio", "Energia", "Água", "Internet"] },
-  { id: "expense-food", name: "Alimentação", type: "expense", subcategories: ["Supermercado", "Restaurante", "Delivery"] },
-  { id: "expense-transport", name: "Transporte", type: "expense", subcategories: ["Combustível", "Aplicativos", "Transporte público"] },
-  { id: "expense-health", name: "Saúde", type: "expense", subcategories: ["Farmácia", "Consultas", "Exames"] },
-  { id: "expense-leisure", name: "Lazer", type: "expense", subcategories: ["Viagens", "Entretenimento", "Assinaturas"] },
-  { id: "expense-other", name: "Outros", type: "expense", subcategories: ["Compras diversas", "Presentes", "Outros"] },
-  { id: "income-salary", name: "Salário", type: "income", subcategories: ["Salário CLT", "Royalties", "Adiantamento"] },
-  { id: "income-investments", name: "Investimentos", type: "income", subcategories: ["Rendimentos", "Dividendos", "Juros"] },
-  { id: "income-other", name: "Outros", type: "income", subcategories: ["Reembolso", "Venda", "Outras receitas"] },
-  { id: "transfer-general", name: "Transferência", type: "transfer", subcategories: ["Entre contas"] },
+  { id: "expense-housing", name: "Moradia", type: "expense", subcategories: [{ id: "expense-housing-sub-0-aluguel", name: "Aluguel" }, { id: "expense-housing-sub-1-condominio", name: "Condomínio" }, { id: "expense-housing-sub-2-energia", name: "Energia" }, { id: "expense-housing-sub-3-agua", name: "Água" }, { id: "expense-housing-sub-4-internet", name: "Internet" }] },
+  { id: "expense-food", name: "Alimentação", type: "expense", subcategories: [{ id: "expense-food-sub-0-supermercado", name: "Supermercado" }, { id: "expense-food-sub-1-restaurante", name: "Restaurante" }, { id: "expense-food-sub-2-delivery", name: "Delivery" }] },
+  { id: "expense-transport", name: "Transporte", type: "expense", subcategories: [{ id: "expense-transport-sub-0-combustivel", name: "Combustível" }, { id: "expense-transport-sub-1-aplicativos", name: "Aplicativos" }, { id: "expense-transport-sub-2-transporte-publico", name: "Transporte público" }] },
+  { id: "expense-health", name: "Saúde", type: "expense", subcategories: [{ id: "expense-health-sub-0-farmacia", name: "Farmácia" }, { id: "expense-health-sub-1-consultas", name: "Consultas" }, { id: "expense-health-sub-2-exames", name: "Exames" }] },
+  { id: "expense-leisure", name: "Lazer", type: "expense", subcategories: [{ id: "expense-leisure-sub-0-viagens", name: "Viagens" }, { id: "expense-leisure-sub-1-entretenimento", name: "Entretenimento" }, { id: "expense-leisure-sub-2-assinaturas", name: "Assinaturas" }] },
+  { id: "expense-other", name: "Outros", type: "expense", subcategories: [{ id: "expense-other-sub-0-compras-diversas", name: "Compras diversas" }, { id: "expense-other-sub-1-presentes", name: "Presentes" }, { id: "expense-other-sub-2-outros", name: "Outros" }] },
+  { id: "income-salary", name: "Salário", type: "income", subcategories: [{ id: "income-salary-sub-0-salario-clt", name: "Salário CLT" }, { id: "income-salary-sub-1-royalties", name: "Royalties" }, { id: "income-salary-sub-2-adiantamento", name: "Adiantamento" }] },
+  { id: "income-investments", name: "Investimentos", type: "income", subcategories: [{ id: "income-investments-sub-0-rendimentos", name: "Rendimentos" }, { id: "income-investments-sub-1-dividendos", name: "Dividendos" }, { id: "income-investments-sub-2-juros", name: "Juros" }] },
+  { id: "income-other", name: "Outros", type: "income", subcategories: [{ id: "income-other-sub-0-reembolso", name: "Reembolso" }, { id: "income-other-sub-1-venda", name: "Venda" }, { id: "income-other-sub-2-outras-receitas", name: "Outras receitas" }] },
+  { id: "transfer-general", name: "Transferência", type: "transfer", subcategories: [{ id: "transfer-general-sub-0-entre-contas", name: "Entre contas" }] },
 ];
 
 function money(cents: number | null) {
@@ -140,8 +168,13 @@ export default function Home() {
         if (data && typeof data === "object") {
           const stored = data as Record<string, unknown>;
           if (Array.isArray(stored.accounts)) setAccounts(stored.accounts as Account[]);
-          if (Array.isArray(stored.transactions)) setTransactions(stored.transactions as Transaction[]);
-          if (Array.isArray(stored.categories)) setCategories(stored.categories as Category[]);
+          const loadedCategories = Array.isArray(stored.categories)
+            ? normalizeCategories(stored.categories as Category[])
+            : initialCategories;
+          setCategories(loadedCategories);
+          if (Array.isArray(stored.transactions)) {
+            setTransactions(migrateTransactions(stored.transactions as Transaction[], loadedCategories));
+          }
         }
       }
     } catch (error) {
@@ -210,7 +243,7 @@ const accountsWithBalance = accounts.filter(
   const availableGroups = categories
     .filter((category) => category.type === transactionType)
     .reduce<Record<string, string[]>>((groups, category) => {
-      groups[category.name] = category.subcategories;
+      groups[category.name] = category.subcategories.map((subcategory) => subcategory.name);
       return groups;
     }, {});
 
@@ -369,7 +402,7 @@ const newAccount: Account = {
     );
     const firstExpense = categories.find((category) => category.type === "expense");
     setTransactionGroup(firstExpense?.name || "");
-    setTransactionSubcategory(firstExpense?.subcategories[0] || "");
+    setTransactionSubcategory(firstExpense?.subcategories[0]?.name || "");
     setPaidFor("");
     setTransactionError("");
   }
@@ -380,7 +413,7 @@ const newAccount: Account = {
 
     const firstCategory = categories.find((category) => category.type === type);
     setTransactionGroup(firstCategory?.name || "");
-    setTransactionSubcategory(firstCategory?.subcategories[0] || "");
+    setTransactionSubcategory(firstCategory?.subcategories[0]?.name || "");
   }
 
   function saveTransaction() {
@@ -437,6 +470,8 @@ if (amountCents <= 0) {
           ? "Entre contas"
           : transactionSubcategory,
       source: "manual" as const,
+      categoryId: categories.find((category) => category.type === transactionType && category.name === (transactionType === "transfer" ? "Transferência" : transactionGroup))?.id,
+      subcategoryId: categories.find((category) => category.type === transactionType && category.name === (transactionType === "transfer" ? "Transferência" : transactionGroup))?.subcategories.find((subcategory) => subcategory.name === (transactionType === "transfer" ? "Entre contas" : transactionSubcategory))?.id,
       ...(paidFor.trim() ? { paidFor: paidFor.trim() } : {}),
     };
 
@@ -489,6 +524,17 @@ if (amountCents <= 0) {
         current.filter((transaction) => transaction.id !== id)
       );
     }
+  }
+
+  function getCategoryNames(transaction: Transaction) {
+    const category = categories.find((item) => item.id === transaction.categoryId)
+      ?? categories.find((item) => item.type === transaction.type && item.name === transaction.group);
+    const subcategory = category?.subcategories.find((item) => item.id === transaction.subcategoryId)
+      ?? category?.subcategories.find((item) => item.name === transaction.subcategory);
+    return {
+      group: category?.name ?? transaction.group,
+      subcategory: subcategory?.name ?? transaction.subcategory,
+    };
   }
 
   function getTransactionAccountName(transaction: Transaction) {
@@ -694,7 +740,7 @@ if (amountCents <= 0) {
                     <div key={transaction.id} className="flex justify-between gap-3 border-b border-[#EDF0F4] py-3 last:border-0">
                       <div>
                         <p className="text-sm font-medium text-[#35445A]">{transaction.description}</p>
-                        <p className="text-xs text-[#94A0AF]">{displayDate(transaction.date)} · {transaction.group}</p>
+                        <p className="text-xs text-[#94A0AF]">{displayDate(transaction.date)} · {getCategoryNames(transaction).group}</p>
                       </div>
                       <span className={`text-sm font-semibold ${transaction.type === "income" ? "text-emerald-700" : "text-[#526176]"}`}>
                         {transaction.type === "income" ? "+" : transaction.type === "expense" ? "−" : ""}
@@ -984,7 +1030,7 @@ if (amountCents <= 0) {
                             {transaction.description}
                           </p>
                           <p className="mt-1 text-xs text-[#94A0AF]">
-                            {transaction.group} · {transaction.subcategory}
+                            {getCategoryNames(transaction).group} · {getCategoryNames(transaction).subcategory}
                           </p>
                           <p className="mt-1 text-[11px] text-[#A0AABA]">
                             {displayDate(transaction.date)} · {getTransactionAccountName(transaction)}
@@ -1102,7 +1148,7 @@ if (amountCents <= 0) {
                       <div>
                         <p className="text-sm font-medium text-[#35445A]">{transaction.description}</p>
                         <p className="mt-1 text-xs text-[#94A0AF]">
-                          {transaction.group} · {displayDate(transaction.date)}
+                          {getCategoryNames(transaction).group} · {displayDate(transaction.date)}
                         </p>
                       </div>
                       <p className={`text-sm font-semibold ${
@@ -1324,7 +1370,12 @@ if (amountCents <= 0) {
         {/* ================================== */}
 
         {active === "Categorias" && (
-          <CategoriesManager categories={categories} onChange={setCategories} />
+          <CategoriesManager
+            categories={categories}
+            onChange={setCategories}
+            usedCategoryIds={transactions.map((transaction) => transaction.categoryId).filter((id): id is string => Boolean(id))}
+            usedSubcategoryIds={transactions.map((transaction) => transaction.subcategoryId).filter((id): id is string => Boolean(id))}
+          />
         )}
 
         {!["Visão geral", "Contas", "Lançamentos", "Categorias"].includes(active) && (
