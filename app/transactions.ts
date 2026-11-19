@@ -13,6 +13,7 @@ type TransactionBase = {
   categoryId?: string;
   subcategoryId?: string;
   paidFor?: string;
+  internalTransferPairId?: string;
   source: TransactionSource;
   externalId?: string;
   importHash?: string;
@@ -56,6 +57,7 @@ export function calculateTransactionTotals(
 ): TransactionTotals {
   return transactions.reduce(
     (totals, transaction) => {
+      if (transaction.internalTransferPairId) return totals;
       if (transaction.type === "income") {
         totals.incomeCents += transaction.amountCents;
       }
