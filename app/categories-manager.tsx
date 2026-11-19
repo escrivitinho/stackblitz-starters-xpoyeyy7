@@ -178,7 +178,7 @@ export default function CategoriesManager({ categories, onChange }: Props) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="moneo-categories space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {(["income", "expense", "transfer"] as CategoryType[]).map((item) => (
           <div key={item} className="rounded-3xl border border-white/90 bg-white/65 p-5 shadow-sm backdrop-blur-2xl">
@@ -196,10 +196,10 @@ export default function CategoriesManager({ categories, onChange }: Props) {
             role="tab"
             aria-selected={type === item}
             onClick={() => selectTab(item)}
-            className={`rounded-xl px-5 py-3 text-sm font-medium transition ${type === item ? "bg-[#294263] text-white shadow-sm" : "text-[#526B8B] hover:bg-white"}`}
+            className={`rounded-xl px-5 py-3 text-sm font-medium transition ${type === item ? "bg-white/90 text-[#25282D] shadow-sm ring-1 ring-white" : "text-[#737780] hover:bg-white/60"}`}
           >
             {item === "income" ? "Receitas" : item === "expense" ? "Despesas" : "Transferências"}
-            <span className={`ml-2 text-xs ${type === item ? "text-white/75" : "text-[#94A0AF]"}`}>
+            <span className={`ml-2 text-xs ${type === item ? "text-[#707780]" : "text-[#94A0AF]"}`}>
               {categories.filter((category) => category.type === item).length}
             </span>
           </button>
@@ -215,11 +215,11 @@ export default function CategoriesManager({ categories, onChange }: Props) {
           <div className="space-y-4">
             <label className="block space-y-2">
               <span className="text-xs font-medium text-[#64748B]">Nome da categoria</span>
-              <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Alimentação" className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#7898BF]" />
+              <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Alimentação" className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF]" />
             </label>
             {error && !editingCategoryId && !editingSubcategory && <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
             <div className="flex justify-end">
-              <button onClick={saveCategory} className="rounded-xl bg-[#294263] px-5 py-3 text-sm font-medium text-white hover:bg-[#203653]">Adicionar categoria</button>
+              <button onClick={saveCategory} className="rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white hover:bg-[#25282D]">Adicionar categoria</button>
             </div>
           </div>
 
@@ -237,11 +237,11 @@ export default function CategoriesManager({ categories, onChange }: Props) {
                             value={editingCategoryName}
                             onChange={(event) => { setEditingCategoryName(event.target.value); setError(""); }}
                             onKeyDown={(event) => { if (event.key === "Enter") saveCategoryName(category); if (event.key === "Escape") setEditingCategoryId(null); }}
-                            className="w-full rounded-lg border border-[#B8C9DC] bg-white px-3 py-2 text-sm text-[#354B68] outline-none focus:border-[#7898BF]"
+                            className="w-full rounded-lg border border-[#B8C9DC] bg-white px-3 py-2 text-sm text-[#354B68] outline-none focus:border-[#A7A9AF]"
                           />
                           {error && <p className="text-xs text-rose-600">{error}</p>}
                           <div className="flex gap-2">
-                            <button onClick={() => saveCategoryName(category)} className="rounded-lg bg-[#294263] px-3 py-1.5 text-xs font-medium text-white">Salvar</button>
+                            <button onClick={() => saveCategoryName(category)} className="rounded-lg bg-[#34383F] px-3 py-1.5 text-xs font-medium text-white">Salvar</button>
                             <button onClick={() => { setEditingCategoryId(null); setError(""); }} className="rounded-lg border border-[#DCE5EF] bg-white px-3 py-1.5 text-xs text-[#64748B]">Cancelar</button>
                           </div>
                         </div>
@@ -269,11 +269,11 @@ export default function CategoriesManager({ categories, onChange }: Props) {
                                 value={editingSubcategoryName}
                                 onChange={(event) => { setEditingSubcategoryName(event.target.value); setError(""); }}
                                 onKeyDown={(event) => { if (event.key === "Enter") saveSubcategoryName(); if (event.key === "Escape") { setEditingSubcategory(null); setError(""); } }}
-                                className="w-full rounded-lg border border-[#B8C9DC] bg-white px-3 py-2 text-sm text-[#52627A] outline-none focus:border-[#7898BF]"
+                                className="w-full rounded-lg border border-[#B8C9DC] bg-white px-3 py-2 text-sm text-[#52627A] outline-none focus:border-[#A7A9AF]"
                               />
                               {error && <p className="text-xs text-rose-600">{error}</p>}
                               <div className="flex gap-2">
-                                <button onClick={saveSubcategoryName} className="rounded-lg bg-[#294263] px-3 py-1.5 text-xs font-medium text-white">Salvar</button>
+                                <button onClick={saveSubcategoryName} className="rounded-lg bg-[#34383F] px-3 py-1.5 text-xs font-medium text-white">Salvar</button>
                                 <button onClick={() => { setEditingSubcategory(null); setError(""); }} className="rounded-lg border border-[#DCE5EF] bg-white px-3 py-1.5 text-xs text-[#64748B]">Cancelar</button>
                               </div>
                             </div>
@@ -294,9 +294,9 @@ export default function CategoriesManager({ categories, onChange }: Props) {
                           onChange={(event) => { setSubcategoryDrafts((drafts) => ({ ...drafts, [category.id]: event.target.value })); setError(""); }}
                           onKeyDown={(event) => { if (event.key === "Enter") addSubcategory(category.id); }}
                           placeholder="Nova subcategoria"
-                          className="min-w-0 flex-1 rounded-lg border border-[#E2E8F0] bg-white/80 px-3 py-2 text-xs outline-none focus:border-[#7898BF]"
+                          className="min-w-0 flex-1 rounded-lg border border-[#E2E8F0] bg-white/80 px-3 py-2 text-xs outline-none focus:border-[#A7A9AF]"
                         />
-                        <button onClick={() => addSubcategory(category.id)} className="rounded-lg bg-[#294263] px-3 py-2 text-xs font-medium text-white hover:bg-[#203653]">Adicionar</button>
+                        <button onClick={() => addSubcategory(category.id)} className="rounded-lg bg-[#34383F] px-3 py-2 text-xs font-medium text-white hover:bg-[#25282D]">Adicionar</button>
                       </div>
                     </div>
                   </div>
