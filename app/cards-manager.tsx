@@ -100,6 +100,42 @@ function parseNubankCsv(text: string): Draft[] {
 }
 
 export default function CardsManager({ entries, onChange, categories }: { entries: CardEntry[]; onChange: (entries: CardEntry[]) => void; categories: Category[] }) {
+  const [manualCard, setManualCard] = useState<CardEntry["card"]>("Nubank Crédito");
+  const [manualDate, setManualDate] = useState(() => new Date().toLocaleDateString("en-CA"));
+  const [manualDescription, setManualDescription] = useState("");
+  const [manualAmount, setManualAmount] = useState("");
+  const [manualInstallments, setManualInstallments] = useState(1);
+  const [manualError, setManualError] = useState("");
+  const [manualSuccess, setManualSuccess] = useState("");
+  function addManualPurchase() {
+    setManualError(""); setManualSuccess("");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(manualDate) || new Date(manualDate + "T12:00:00Z").toISOString().slice(0, 10) !== manualDate) {
+      setManualError("Informe uma data válida."); return;
+    }
+    if (!manualDescription.trim()) { setManualError("Informe a descrição da compra."); return; }
+    let total: number;
+    try { total = parseAmount(manualAmount); }
+    catch { setManualError("Informe um valor válido, como 700,00."); return; }
+    if (total <= 0) { setManualError("O valor precisa ser maior que zero."); return; }
+    if (!Number.isInteger(manualInstallments) || manualInstallments < 1 || manualInstallments > 48) {
+      setManualError("Escolha entre 1 e 48 parcelas."); return;
+    }
+    const [year, month] = manualDate.split("-").map(Number);
+    const groupId = crypto.randomUUID();
+    const base = Math.floor(total / manualInstallments);
+    const remainder = total % manualInstallments;
+    const created: CardEntry[] = Array.from({ length: manualInstallments }, (_, index) => ({
+      id: crypto.randomUUID(), card: manualCard,
+      date: new Date(Date.UTC(year, month + index, 8)).toISOString().slice(0, 10),
+      description: manualDescription.trim() + (manualInstallments > 1 ? " - Parcela " + (index + 1) + "/" + manualInstallments : ""),
+      amountCents: base + (index < remainder ? 1 : 0),
+      importKey: "manual-card:" + groupId + ":" + (index + 1),
+      kind: "purchase" as const,
+    }));
+    onChange([...entries, ...created]);
+    setManualSuccess(manualInstallments === 1 ? "Compra registrada." : manualInstallments + " parcelas registradas.");
+    setManualDescription(""); setManualAmount(""); setManualInstallments(1);
+  }
   const [cardFilter, setCardFilter] = useState("Todos");
   const [monthFilter, setMonthFilter] = useState("Todos");
   const expenseCategories = categories.filter((category) => category.type === "expense");
@@ -140,6 +176,21 @@ export default function CardsManager({ entries, onChange, categories }: { entrie
           </div>;
         })}
       </div>
+      <section className="rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm backdrop-blur-2xl">
+        <h3 className="text-lg font-semibold text-[#26364D]">Registrar compra no cartão</h3>
+        <p className="mt-2 text-sm text-[#707780]">À vista ou parcelada. Cada parcela aparece no mês de sua fatura, sem alterar o saldo bancário. A conciliação com CSV será implementada depois.</p>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <label className="text-xs font-medium text-[#64748B]">Cartão<select value={manualCard} onChange={(e) => setManualCard(e.target.value as CardEntry["card"])} className="mt-1 block w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-3 text-sm"><option>Nubank Crédito</option><option>Inter Crédito</option></select></label>
+          <label className="text-xs font-medium text-[#64748B]">Data da compra<input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} className="mt-1 block w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-3 text-sm" /></label>
+          <label className="text-xs font-medium text-[#64748B]">Descrição<input value={manualDescription} onChange={(e) => setManualDescription(e.target.value)} placeholder="Ex.: Mercado" className="mt-1 block w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-3 text-sm" /></label>
+          <label className="text-xs font-medium text-[#64748B]">Valor total (R$)<input value={manualAmount} onChange={(e) => setManualAmount(e.target.value)} inputMode="decimal" placeholder="700,00" className="mt-1 block w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-3 text-sm" /></label>
+          <label className="text-xs font-medium text-[#64748B]">Parcelas (1 a 48)<input type="number" min={1} max={48} step={1} value={manualInstallments} onChange={(e) => setManualInstallments(Number(e.target.value))} className="mt-1 block w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-3 text-sm" /></label>
+        </div>
+        <p className="mt-3 text-xs text-[#77879B]">Regra provisória: primeira fatura no mês seguinte, vencimento dia 8. Configuração do fechamento e vencimento por cartão ainda será adicionada. Não utilize para compras reais antes dessa configuração.</p>
+        {manualError && <p role="alert" className="mt-3 text-sm text-rose-700">{manualError}</p>}
+        {manualSuccess && <p role="status" className="mt-3 text-sm text-emerald-700">{manualSuccess}</p>}
+        <button type="button" onClick={addManualPurchase} className="mt-4 rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white hover:bg-[#25282D]">Registrar compra</button>
+      </section>
       <section className="rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm backdrop-blur-2xl">
         <h3 className="text-lg font-semibold text-[#26364D]">Importar fatura Nubank (CSV)</h3>
         <p className="mt-2 text-sm text-[#707780]">Selecione um arquivo exportado pelo Nubank. Confira todas as movimentações antes de salvar. A integração com o Google Drive virá depois.</p>
