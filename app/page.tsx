@@ -984,9 +984,9 @@ if (amountCents <= 0) {
 
                   <div className="mb-5 space-y-2">
                     <span className="text-xs font-medium text-[#64748B]">{transactionType === "expense" && paymentMethod === "credit" ? "Cartão" : "Conta"}</span>
-                    <div className="flex flex-wrap gap-3">
-                      {(transactionType === "expense" && paymentMethod === "credit" ? (["Nubank Crédito", "Inter Crédito"] as CardEntry["card"][]) : accounts.map((account) => account.name)).map((name, index) => {
-                        const account = transactionType === "expense" && paymentMethod === "credit" ? null : accounts[index];
+                    <div className="flex flex-wrap justify-center gap-3">
+                      {(transactionType === "expense" && paymentMethod === "credit" ? (["Nubank Crédito", "Inter Crédito"] as CardEntry["card"][]) : [...accounts].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map((account) => account.name)).map((name, index) => {
+                        const account = transactionType === "expense" && paymentMethod === "credit" ? null : accounts.find((item) => item.name === name);
                         const selected = account ? transactionAccount === String(account.id) : selectedCreditCard === name;
                         const tone = name.toLowerCase().includes("nubank") ? "violet" : name.toLowerCase().includes("inter") ? "orange" : name.toLowerCase().includes("caixa") ? "sky" : "teal";
                         const palette = {
@@ -995,7 +995,7 @@ if (amountCents <= 0) {
                           sky: selected ? "border-sky-400/80 bg-sky-200/75 text-sky-950 shadow-[0_6px_22px_rgba(14,165,233,0.18)]" : "border-sky-200/80 bg-sky-100/55 text-sky-800",
                           teal: selected ? "border-teal-400/80 bg-teal-200/75 text-teal-950 shadow-[0_6px_22px_rgba(20,184,166,0.18)]" : "border-teal-200/80 bg-teal-100/55 text-teal-800",
                         };
-                        return <button key={account?.id ?? name} type="button" aria-pressed={selected} onClick={() => account ? setTransactionAccount(String(account.id)) : setSelectedCreditCard(name as CardEntry["card"])} className={`rounded-2xl border px-5 py-3 text-sm font-semibold backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-lg ${palette[tone]}`}>{name}{selected ? " ✓" : ""}</button>;
+                        return <button key={account?.id ?? name} type="button" aria-pressed={selected} onClick={() => account ? setTransactionAccount(String(account.id)) : setSelectedCreditCard(name as CardEntry["card"])} className={`flex min-h-12 w-44 items-center justify-center rounded-2xl border px-4 py-3 text-center text-sm font-semibold backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-lg ${palette[tone]}`}>{name}{selected ? " ✓" : ""}</button>;
                       })}
                     </div>
                   </div>
