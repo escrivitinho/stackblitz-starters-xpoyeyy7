@@ -532,10 +532,10 @@ if (amountCents <= 0) {
   );
 
   return (
-    <main className="min-h-screen bg-[#F1F4F8] text-[#202B3C] md:flex">
+    <main className="moneo-app min-h-screen bg-[#F5F5F7] text-[#202B3C] md:flex">
 
       {/* MENU LATERAL */}
-      <aside className="flex w-full flex-col bg-[#14243D] px-5 py-6 text-white md:fixed md:inset-y-0 md:w-[250px]">
+      <aside className="moneo-sidebar flex w-full flex-col bg-white/55 px-5 py-6 text-[#34383F] md:fixed md:inset-y-0 md:w-[250px]">
         <div className="mb-10 flex items-center gap-3 px-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#D8E5F5] text-xl font-bold text-[#14243D]">
             M
@@ -557,8 +557,8 @@ if (amountCents <= 0) {
               onClick={() => goToPage(item.name)}
               className={`flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
                 active === item.name
-                  ? "bg-[#294263] font-medium text-white"
-                  : "text-slate-400 hover:bg-[#203652] hover:text-white"
+                  ? "bg-white/80 font-medium text-[#25282D] shadow-sm ring-1 ring-white/80"
+                  : "text-[#707780] hover:bg-white/60 hover:text-[#25282D]"
               }`}
             >
               <span className="text-lg">{item.icon}</span>
@@ -567,8 +567,8 @@ if (amountCents <= 0) {
           ))}
         </nav>
 
-        <div className="mt-8 hidden rounded-2xl border border-[#344761] bg-[#1B304C] p-4 md:block">
-          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-[#314B6B] text-lg">
+        <div className="mt-8 hidden rounded-2xl border border-white/60 bg-white/55 p-4 md:block">
+          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white/60 text-lg">
             ✧
           </div>
           <p className="text-sm font-medium">Seu planejamento</p>
@@ -583,10 +583,10 @@ if (amountCents <= 0) {
           </button>
         </div>
 
-        <div className="mt-auto hidden border-t border-[#344761] pt-5 md:block">
+        <div className="mt-auto hidden border-t border-white/60 pt-5 md:block">
           <button
             onClick={() => goToPage("Configurações")}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-400 hover:bg-[#203652]"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-400 hover:bg-white/35"
           >
             ⚙ Configurações
           </button>
@@ -753,7 +753,7 @@ if (amountCents <= 0) {
                   resetTransactionForm();
                   setShowTransactionForm(true);
                 }}
-                className="rounded-xl bg-[#294263] px-5 py-3 text-sm font-medium text-white shadow-lg shadow-blue-900/10 transition hover:bg-[#203653]"
+                className="rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white shadow-lg shadow-blue-900/10 transition hover:bg-[#25282D]"
               >
                 + Novo lançamento
               </button>
@@ -784,7 +784,7 @@ if (amountCents <= 0) {
                       onClick={() => changeTransactionType(type)}
                       className={`rounded-xl border px-3 py-3 text-sm font-medium transition ${
                         transactionType === type
-                          ? "border-[#7898BF] bg-[#EDF4FC] text-[#294263]"
+                          ? "border-[#A7A9AF] bg-white/70 text-[#294263]"
                           : "border-[#E2E8F0] bg-white/60 text-[#8290A2] hover:bg-white"
                       }`}
                     >
@@ -801,7 +801,7 @@ if (amountCents <= 0) {
                       value={transactionDescription}
                       onChange={(e) => setTransactionDescription(e.target.value)}
                       placeholder="Ex.: Supermercado"
-                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#7898BF]"
+                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF]"
                     />
                   </label>
 
@@ -812,7 +812,7 @@ if (amountCents <= 0) {
                       onChange={(e) => setTransactionAmount(e.target.value)}
                       placeholder="Ex.: 150,00"
                       inputMode="decimal"
-                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#7898BF]"
+                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF]"
                     />
                   </label>
 
@@ -822,7 +822,7 @@ if (amountCents <= 0) {
                       type="date"
                       value={transactionDate}
                       onChange={(e) => setTransactionDate(e.target.value)}
-                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#7898BF]"
+                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF]"
                     />
                   </label>
 
@@ -899,7 +899,7 @@ if (amountCents <= 0) {
                           value={paidFor}
                           onChange={(e) => setPaidFor(e.target.value)}
                           placeholder="Ex.: João — compra que será reembolsada"
-                          className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#7898BF]"
+                          className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF]"
                         />
                       </label>
                     </>
@@ -929,7 +929,7 @@ if (amountCents <= 0) {
                   </button>
                   <button
                     onClick={saveTransaction}
-                    className="rounded-xl bg-[#294263] px-6 py-3 text-sm font-medium text-white hover:bg-[#203653]"
+                    className="rounded-xl bg-[#34383F] px-6 py-3 text-sm font-medium text-white hover:bg-[#25282D]"
                   >
                     Salvar lançamento
                   </button>
@@ -957,7 +957,7 @@ if (amountCents <= 0) {
                   </p>
                   <button
                     onClick={() => setShowTransactionForm(true)}
-                    className="mt-5 rounded-xl bg-[#294263] px-5 py-3 text-sm font-medium text-white"
+                    className="mt-5 rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white"
                   >
                     + Novo lançamento
                   </button>
@@ -1151,7 +1151,7 @@ if (amountCents <= 0) {
                   setShowAccountForm(true);
                   setAccountError("");
                 }}
-                className="rounded-xl bg-[#294263] px-5 py-3 text-sm font-medium text-white shadow-lg shadow-blue-900/10 hover:bg-[#203653]"
+                className="rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white shadow-lg shadow-blue-900/10 hover:bg-[#25282D]"
               >
                 + Adicionar conta
               </button>
@@ -1176,7 +1176,7 @@ if (amountCents <= 0) {
                       value={accountName}
                       onChange={(e) => setAccountName(e.target.value)}
                       placeholder="Ex.: Nubank, Inter, Caixa..."
-                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#7898BF]"
+                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF]"
                     />
                   </label>
                   <label className="space-y-2">
@@ -1202,7 +1202,7 @@ if (amountCents <= 0) {
                       type="button"
                       onClick={() => setBalanceMethod("manual")}
                       className={`rounded-2xl border p-4 text-left transition ${
-                        balanceMethod === "manual" ? "border-[#7898BF] bg-[#EDF4FC]" : "border-[#E2E8F0] bg-white/60"
+                        balanceMethod === "manual" ? "border-[#A7A9AF] bg-white/70" : "border-[#E2E8F0] bg-white/60"
                       }`}
                     >
                       <span className="text-lg">✎</span>
@@ -1213,7 +1213,7 @@ if (amountCents <= 0) {
                       type="button"
                       onClick={() => setBalanceMethod("statement")}
                       className={`rounded-2xl border p-4 text-left transition ${
-                        balanceMethod === "statement" ? "border-[#7898BF] bg-[#EDF4FC]" : "border-[#E2E8F0] bg-white/60"
+                        balanceMethod === "statement" ? "border-[#A7A9AF] bg-white/70" : "border-[#E2E8F0] bg-white/60"
                       }`}
                     >
                       <span className="text-lg">⇧</span>
@@ -1234,7 +1234,7 @@ if (amountCents <= 0) {
                       }}
                       placeholder="Ex.: 1.500,00"
                       inputMode="decimal"
-                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#7898BF] md:max-w-sm"
+                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF] md:max-w-sm"
                     />
                   </label>
                 )}
@@ -1246,7 +1246,7 @@ if (amountCents <= 0) {
                       type="date"
                       value={openingBalanceDate}
                       onChange={(e) => { setOpeningBalanceDate(e.target.value); setAccountError(""); }}
-                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#7898BF] md:max-w-sm"
+                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF] md:max-w-sm"
                     />
                   </label>
                 )}
@@ -1270,7 +1270,7 @@ if (amountCents <= 0) {
                   <button onClick={closeAccountForm} className="rounded-xl border border-[#E2E8F0] bg-white/70 px-5 py-3 text-sm text-[#64748B]">
                     Cancelar
                   </button>
-                  <button onClick={saveAccount} className="rounded-xl bg-[#294263] px-6 py-3 text-sm font-medium text-white hover:bg-[#203653]">
+                  <button onClick={saveAccount} className="rounded-xl bg-[#34383F] px-6 py-3 text-sm font-medium text-white hover:bg-[#25282D]">
                     Salvar conta
                   </button>
                 </div>
@@ -1334,7 +1334,7 @@ if (amountCents <= 0) {
             <p className="mt-2 max-w-sm text-sm leading-6 text-[#8A98AA]">
               Este módulo está no nosso planejamento e será desenvolvido nas próximas etapas do MONEO.
             </p>
-            <button onClick={() => goToPage("Visão geral")} className="mt-6 rounded-xl bg-[#294263] px-5 py-3 text-sm font-medium text-white hover:bg-[#203653]">
+            <button onClick={() => goToPage("Visão geral")} className="mt-6 rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white hover:bg-[#25282D]">
               Voltar à visão geral
             </button>
           </div>
