@@ -47,9 +47,9 @@ async function findFolder(token: string, parent: string, name: string): Promise<
 type OfxEntry = { date: string; description: string; amount: number; fitid: string };
 function parseOfx(raw: string): OfxEntry[] {
   const entries: OfxEntry[] = [];
-  const blocks = raw.match(/<STMTTRN>([\\s\\S]*?)(?:<\\/STMTTRN>|(?=<STMTTRN>)|$)/gi) || [];
+  const blocks = raw.match(/<STMTTRN\b[^>]*>[\s\S]*?(?:<\/STMTTRN>|(?=<STMTTRN\b)|$)/gi) || [];
   const field = (block: string, tag: string) => {
-    const match = block.match(new RegExp("<" + tag + ">\\\\s*([^<\\\\r\\\\n]+)", "i"));
+    const match = block.match(new RegExp("<" + tag + ">\\s*([^<\\r\\n]+)", "i"));
     return match?.[1]?.trim() || "";
   };
   for (const block of blocks) {
@@ -57,7 +57,7 @@ function parseOfx(raw: string): OfxEntry[] {
     const rawAmount = field(block, "TRNAMT").replace(",", ".");
     const amount = Number(rawAmount);
     const date = rawDate.slice(0, 8);
-    if (!/^\\d{8}$/.test(date) || !Number.isFinite(amount) || !rawAmount) continue;
+    if (!/^\d{8}$/.test(date) || !Number.isFinite(amount) || !rawAmount) continue;
     const description = field(block, "MEMO") || field(block, "NAME") || field(block, "TRNTYPE") || "Sem descrição";
     entries.push({ date: date.slice(6, 8) + "/" + date.slice(4, 6) + "/" + date.slice(0, 4), description, amount, fitid: field(block, "FITID") });
   }
