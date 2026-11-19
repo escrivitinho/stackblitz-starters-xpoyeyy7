@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatCents } from "./lib/money";
+import type { Category } from "./categories-manager";
 
 export type CardEntry = {
   id: string;
@@ -10,6 +11,9 @@ export type CardEntry = {
   description: string;
   amountCents: number;
   importKey: string;
+  categoryId?: string;
+  subcategoryId?: string;
+  kind?: "purchase" | "credit" | "payment";
 };
 
 type Draft = Omit<CardEntry, "id">;
@@ -66,7 +70,13 @@ function parseNubankCsv(text: string): Draft[] {
   });
 }
 
-export default function CardsManager({ entries, onChange }: { entries: CardEntry[]; onChange: (entries: CardEntry[]) => void }) {
+export default function CardsManager({ entries, onChange, categories }: { entries: CardEntry[]; onChange: (entries: CardEntry[]) => void; categories: Category[] }) {
+  const [cardFilter, setCardFilter] = useState("Todos");
+  const [monthFilter, setMonthFilter] = useState("Todos");
+  const expenseCategories = categories.filter((category) => category.type === "expense");
+  const months = [...new Set(entries.map((entry) => entry.date.slice(0, 7)))].sort().reverse();
+  const filtered = entries.filter((entry) => (cardFilter === "Todos" || entry.card === cardFilter) && (monthFilter === "Todos" || entry.date.startsWith(monthFilter))).sort((a, b) => b.date.localeCompare(a.date));
+  function updateEntry(id: string, changes: Partial<CardEntry>) { onChange(entries.map((entry) => entry.id === id ? { ...entry, ...changes } : entry)); }
   const [preview, setPreview] = useState<Draft[]>([]);
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
@@ -124,8 +134,36 @@ export default function CardsManager({ entries, onChange }: { entries: CardEntry
         </>}
       </section>
       {entries.length > 0 && <section className="rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm backdrop-blur-2xl">
-        <h3 className="font-semibold text-[#26364D]">Movimentações de cartões salvas</h3>
-        <p className="mt-2 text-sm text-[#77879B]">{entries.length} registros armazenados neste navegador e incluídos no backup.</p>
+        <h3 className="text-lg font-semibold text-[#26364D]">Movimentações dos cartões</h3>
+        <p className="mt-2 text-sm text-[#77879B]">Classifique cada registro. Pagamentos e estornos não são despesas novas. As alterações são salvas automaticamente neste navegador.</p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <label className="text-xs text-[#64748B]">Cartão<select aria-label="Filtrar cartão" className="mt-1 block rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-sm" value={cardFilter} onChange={(e) => setCardFilter(e.target.value)}><option>Todos</option><option>Nubank Crédito</option><option>Inter Crédito</option></select></label>
+          <label className="text-xs text-[#64748B]">Mês<select aria-label="Filtrar mês" className="mt-1 block rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-sm" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}><option>Todos</option>{months.map((month) => <option key={month} value={month}>{month.slice(5)}/{month.slice(0, 4)}</option>)}</select></label>
+        </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl bg-white/70 p-4"><p className="text-xs text-[#77879B]">Compras</p><p className="mt-2 font-semibold text-[#B65D58]">{formatCents(filtered.filter((entry) => (entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase")) === "purchase").reduce((sum, entry) => sum + Math.abs(entry.amountCents), 0))}</p></div>
+          <div className="rounded-2xl bg-white/70 p-4"><p className="text-xs text-[#77879B]">Créditos / estornos</p><p className="mt-2 font-semibold text-emerald-700">{formatCents(filtered.filter((entry) => (entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase")) === "credit").reduce((sum, entry) => sum + Math.abs(entry.amountCents), 0))}</p></div>
+          <div className="rounded-2xl bg-white/70 p-4"><p className="text-xs text-[#77879B]">Pagamentos identificados</p><p className="mt-2 font-semibold text-[#26364D]">{formatCents(filtered.filter((entry) => entry.kind === "payment").reduce((sum, entry) => sum + Math.abs(entry.amountCents), 0))}</p></div>
+        </div>
+        <div className="mt-5 space-y-3">
+          {filtered.map((entry) => {
+            const kind = entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase");
+            const category = expenseCategories.find((item) => item.id === entry.categoryId);
+            return <div key={entry.id} className="rounded-2xl border border-[#E5EAF0] bg-white/75 p-4">
+              <div className="flex flex-wrap justify-between gap-3">
+                <div className="min-w-0"><p className="font-medium text-[#26364D]">{entry.description}</p><p className="mt-1 text-xs text-[#77879B]">{entry.date.split("-").reverse().join("/")} · {entry.card}</p></div>
+                <p className={`font-semibold ${entry.amountCents < 0 ? "text-emerald-700" : "text-[#B65D58]"}`}>{entry.amountCents < 0 ? "−" : ""}{formatCents(Math.abs(entry.amountCents))}</p>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <label className="text-xs text-[#64748B]">Tipo<select aria-label={"Tipo: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm" value={kind} onChange={(e) => updateEntry(entry.id, { kind: e.target.value as CardEntry["kind"], categoryId: undefined, subcategoryId: undefined })}><option value="purchase">Compra</option><option value="credit">Crédito / estorno</option><option value="payment">Pagamento da fatura</option></select></label>
+                <label className="text-xs text-[#64748B]">Categoria<select disabled={kind !== "purchase"} aria-label={"Categoria: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm disabled:opacity-40" value={entry.categoryId ?? ""} onChange={(e) => updateEntry(entry.id, { categoryId: e.target.value || undefined, subcategoryId: undefined })}><option value="">Não classificada</option>{expenseCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                <label className="text-xs text-[#64748B]">Subcategoria<select disabled={kind !== "purchase" || !category} aria-label={"Subcategoria: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm disabled:opacity-40" value={entry.subcategoryId ?? ""} onChange={(e) => updateEntry(entry.id, { subcategoryId: e.target.value || undefined })}><option value="">Não selecionada</option>{category?.subcategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+              </div>
+            </div>;
+          })}
+          {filtered.length === 0 && <p className="py-5 text-sm text-[#77879B]">Nenhuma movimentação neste filtro.</p>}
+        </div>
+        <p className="mt-4 text-xs text-[#77879B]">Os totais acima são informativos e ainda não alimentam a Visão geral. Os registros originais e seus identificadores de importação são preservados.</p>
       </section>}
     </div>
   );
