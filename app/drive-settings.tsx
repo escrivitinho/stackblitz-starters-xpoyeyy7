@@ -23,6 +23,15 @@ const folders = [
 
 type FolderResult = { path: string; status: "found" | "missing" | "ambiguous"; id?: string };
 type FileResult = { id: string; name: string; size?: string; modifiedTime?: string; folderPath: string };
+function bankForPath(path: string): string {
+  const parts = path.split(" / ");
+  const bank = folders.find((folder) => folder.format === "OFX" && (path === folder.path || path.startsWith(folder.path + " / ")));
+  return bank?.path.split(" / ").pop() || parts[parts.length - 1];
+}
+function isBankOfx(file: FileResult): boolean {
+  return file.name.toLowerCase().endsWith(".ofx") && folders.some((folder) => folder.format === "OFX" && (file.folderPath === folder.path || file.folderPath.startsWith(folder.path + " / ")));
+}
+
 type DriveItem = { id: string; name: string };
 
 async function findFolder(token: string, parent: string, name: string): Promise<DriveItem[]> {
@@ -194,13 +203,11 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
     setAuditResults(null);
     try {
       const output: FileResult[] = [];
-      for (const folder of folders) {
-        const found = results.find((item) => item.path === folder.path);
-        if (!found?.id || found.status !== "found") continue;
+      async function collectFiles(folderId: string, folderPath: string, format: string, depth: number): Promise<void> {
         let pageToken: string | undefined;
         do {
           const params = new URLSearchParams({
-            q: "'" + found.id + "' in parents and trashed = false",
+            q: "'" + folderId + "' in parents and trashed = false",
             fields: "nextPageToken,files(id,name,size,modifiedTime,mimeType)",
             pageSize: "100",
           });
@@ -212,12 +219,23 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
           if (!response.ok) throw new Error(response.status === 401 ? "Sua autorização expirou. Reconecte o Google Drive." : "Erro ao listar arquivos (" + response.status + ").");
           const data = await response.json() as { nextPageToken?: string; files?: Array<{ id: string; name: string; size?: string; modifiedTime?: string; mimeType?: string }> };
           for (const file of data.files || []) {
-            if (file.mimeType === "application/vnd.google-apps.folder") continue;
-            if (!file.name.toLowerCase().endsWith("." + folder.format.toLowerCase())) continue;
-            output.push({ id: file.id, name: file.name, size: file.size, modifiedTime: file.modifiedTime, folderPath: folder.path });
+            if (file.mimeType === "application/vnd.google-apps.folder") {
+              // Somente subpastas de ano, evitando ler documentos de outras organizações.
+              if (format === "OFX" && depth === 0 && /^20\\d{2}$/.test(file.name)) {
+                await collectFiles(file.id, folderPath + " / " + file.name, format, depth + 1);
+              }
+              continue;
+            }
+            if (!file.name.toLowerCase().endsWith("." + format.toLowerCase())) continue;
+            output.push({ id: file.id, name: file.name, size: file.size, modifiedTime: file.modifiedTime, folderPath });
           }
           pageToken = data.nextPageToken;
         } while (pageToken);
+      }
+      for (const folder of folders) {
+        const found = results.find((item) => item.path === folder.path);
+        if (!found?.id || found.status !== "found") continue;
+        await collectFiles(found.id, folder.path, folder.format, 0);
       }
       output.sort((a, b) => (b.modifiedTime || "").localeCompare(a.modifiedTime || ""));
       setFiles(output);
@@ -263,7 +281,7 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
   async function auditOfxFiles() {
     const token = tokenRef.current;
     if (!token || !files || auditing || syncing) return;
-    const bankFiles = files.filter((file) => file.name.toLowerCase().endsWith(".ofx") && folders.some((folder) => folder.format === "OFX" && folder.path === file.folderPath));
+    const bankFiles = files.filter((file) => isBankOfx(file));
     setAuditing(true);
     setError("");
     setAuditResults(null);
@@ -279,7 +297,7 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
     try {
       for (let i = 0; i < bankFiles.length; i++) {
         const file = bankFiles[i];
-        const bank = file.folderPath.split(" / ").pop() || "Desconhecido";
+        const bank = bankForPath(file.folderPath);
         setAuditProgress("Analisando " + (i + 1) + "/" + bankFiles.length + ": " + file.name);
         const account = accounts.find((item) => item.name.toLocaleUpperCase("pt-BR") === bank.toLocaleUpperCase("pt-BR"));
         try {
@@ -332,7 +350,7 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
       setError("Localize as três pastas bancárias antes de sincronizar.");
       return;
     }
-    const bankFiles = files.filter((file) => file.name.toLowerCase().endsWith(".ofx") && bankFolders.some((folder) => folder.path === file.folderPath));
+    const bankFiles = files.filter((file) => isBankOfx(file));
     if (!bankFiles.length) { setError("Nenhum extrato OFX disponível."); return; }
     if (!window.confirm("Verificar " + bankFiles.length + " extratos OFX e importar automaticamente apenas movimentações novas? Possíveis duplicidades serão ignoradas. Faça um backup JSON antes de continuar.")) return;
     setSyncing(true);
@@ -360,7 +378,7 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
       for (let index = 0; index < bankFiles.length; index++) {
         const file = bankFiles[index];
         setSyncProgress("Lendo extrato " + (index + 1) + " de " + bankFiles.length + ": " + file.name);
-        const accountName = file.folderPath.split(" / ").pop();
+        const accountName = bankForPath(file.folderPath);
         const account = accounts.find((item) => item.name.toLocaleUpperCase("pt-BR") === accountName?.toLocaleUpperCase("pt-BR"));
         if (!account) throw new Error("Conta bancária não identificada para " + file.name + ". Nada foi importado.");
         if (file.size && Number(file.size) > 5 * 1024 * 1024) throw new Error("Arquivo acima de 5 MB: " + file.name + ". Nada foi importado.");
@@ -421,7 +439,7 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
   }
 
   const previewAccount = preview ? accounts.find((account) =>
-    preview.folderPath.split(" / ").pop()?.toLocaleUpperCase("pt-BR") === account.name.toLocaleUpperCase("pt-BR")
+    bankForPath(preview.folderPath)?.toLocaleUpperCase("pt-BR") === account.name.toLocaleUpperCase("pt-BR")
   ) : undefined;
   const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
   const classified = preview?.entries.map((entry) => {
@@ -495,7 +513,7 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
         <p className="text-xs text-[#77879B]">A autorização permite leitura de todo o Drive, não apenas das pastas listadas. Nenhum arquivo será importado nesta etapa.</p>
       </div>
       {connected && <div className="mt-4"><button type="button" disabled={checking} onClick={() => void checkFolders()} className="rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white disabled:opacity-50">{checking ? "Procurando pastas..." : "Localizar pastas no Drive"}</button><p className="mt-2 text-xs text-[#77879B]">Consulta apenas nomes e identificadores de pastas. Não lê nem importa arquivos financeiros.</p></div>}
-      {results?.some((item) => item.status === "found") && <div className="mt-4"><button type="button" disabled={checking || loadingFiles} onClick={() => void checkFiles()} className="rounded-xl border border-[#DCE5EF] bg-white/80 px-5 py-3 text-sm font-medium text-[#34383F] disabled:opacity-50">{loadingFiles ? "Verificando arquivos..." : "Verificar arquivos"}</button><p className="mt-2 text-xs text-[#77879B]">Exibe somente metadados de OFX e CSV nas pastas encontradas, sem baixar o conteúdo.</p></div>}
+      {results?.some((item) => item.status === "found") && <div className="mt-4"><button type="button" disabled={checking || loadingFiles} onClick={() => void checkFiles()} className="rounded-xl border border-[#DCE5EF] bg-white/80 px-5 py-3 text-sm font-medium text-[#34383F] disabled:opacity-50">{loadingFiles ? "Verificando arquivos..." : "Verificar arquivos"}</button><p className="mt-2 text-xs text-[#77879B]">Exibe metadados de OFX nas pastas dos bancos e nas subpastas anuais (2026, 2027 etc.), além dos CSV de faturas, sem baixar o conteúdo.</p></div>}
       {files && <div className="mt-4 rounded-2xl border border-[#DCE5EF] bg-white/90 p-4"><h3 className="text-sm font-semibold text-[#26364D]">Arquivos pendentes de importação</h3><p className="mt-1 text-xs text-[#77879B]">Analisa todos os extratos OFX sem importar nenhuma movimentação. Identifica arquivos pendentes, parcialmente importados e com problemas de leitura.</p><button type="button" disabled={auditing || syncing || !connected} onClick={() => void auditOfxFiles()} className="mt-3 rounded-xl border border-[#DCE5EF] px-4 py-2 text-sm font-medium disabled:opacity-50">{auditing ? "Verificando extratos..." : "Verificar arquivos não importados"}</button>{auditProgress && <p role="status" className="mt-2 text-xs text-[#526F96]">{auditProgress}</p>}{auditResults && <div className="mt-3 max-h-96 overflow-auto"><p className="mb-2 text-xs font-semibold text-[#26364D]">{auditResults.filter((item) => item.pending > 0).length} arquivos com movimentações novas · {auditResults.filter((item) => Boolean(item.error)).length} arquivos com erro · {auditResults.filter((item) => item.review > 0).length} arquivos com movimentações para revisão</p><table className="w-full min-w-[550px] text-left text-xs"><thead><tr className="border-b"><th className="py-2">Banco</th><th>Arquivo</th><th>Novas</th><th>Existentes</th><th>Revisar</th><th>Situação</th></tr></thead><tbody>{auditResults.map((item) => <tr key={item.id} className="border-b border-[#EEF2F6]"><td className="py-2">{item.bank}</td><td>{item.name}</td><td>{item.pending}</td><td>{item.existing}</td><td>{item.review}</td><td>{item.error ? "Erro: " + item.error : item.empty ? "Sem movimentações" : item.pending > 0 && item.existing > 0 ? "Parcial" : item.pending > 0 ? "Pendente" : item.review > 0 ? "Revisar" : "Sem pendências"}</td></tr>)}</tbody></table></div>}</div>}
       {files && <div className="mt-4 rounded-2xl border border-[#DCE5EF] bg-white/90 p-4"><h3 className="text-sm font-semibold text-[#26364D]">Sincronização de extratos bancários</h3><p className="mt-1 text-xs text-[#77879B]">Verifica todos os OFX de Caixa, Inter e Nubank, evita importações repetidas e não importa movimentações suspeitas. Faturas CSV não estão incluídas.</p><button type="button" disabled={syncing || loadingFiles || checking || !connected} onClick={() => void syncAllOfx()} className="mt-3 rounded-xl bg-[#34383F] px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{syncing ? "Sincronizando..." : "Sincronizar todos os extratos OFX"}</button>{syncProgress && <p role="status" className="mt-2 text-xs text-[#526F96]">{syncProgress}</p>}{syncSummary && <p role="status" className="mt-2 text-sm text-emerald-700">{syncSummary}</p>}{syncEmptyFiles.length > 0 && <div className="mt-2 text-xs text-emerald-700"><p className="font-semibold">Processados — sem movimentações:</p><ul className="mt-1 list-disc pl-5">{syncEmptyFiles.map((item, index) => <li key={index}>{item}</li>)}</ul></div>}{syncSkippedFiles.length > 0 && <div className="mt-2 text-xs text-amber-800"><p className="font-semibold">Arquivos com erro de leitura:</p><ul className="mt-1 list-disc pl-5">{syncSkippedFiles.map((item, index) => <li key={index}>{item}</li>)}</ul></div>}</div>}
       {files && <div className="mt-5 rounded-2xl border border-[#E5EAF0] bg-white/70 p-4"><h3 className="text-sm font-semibold text-[#26364D]">Arquivos encontrados ({files.length})</h3>{files.length === 0 ? <p className="mt-3 text-sm text-[#77879B]">Nenhum arquivo OFX ou CSV encontrado nas pastas correspondentes.</p> : <div className="mt-3 max-h-96 space-y-2 overflow-y-auto">{files.map((file) => <div key={file.id} className="border-t border-[#E5EAF0] pt-2"><div className="flex flex-wrap items-center justify-between gap-2"><p className="break-all text-sm font-medium text-[#26364D]">{file.name}</p>{file.name.toLowerCase().endsWith(".ofx") && <button type="button" disabled={loadingPreview} onClick={() => void previewOfx(file)} className="rounded-lg border border-[#DCE5EF] px-3 py-1 text-xs font-medium text-[#34383F] disabled:opacity-50">{loadingPreview ? "Lendo..." : "Prévia OFX"}</button>}</div><p className="text-xs text-[#77879B]">{folders.find((folder) => folder.path === file.folderPath)?.label} · {file.modifiedTime ? new Date(file.modifiedTime).toLocaleDateString("pt-BR") : "Data indisponível"} · {file.size ? (Number(file.size) / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " KB" : "Tamanho indisponível"}</p></div>)}</div>}</div>}
