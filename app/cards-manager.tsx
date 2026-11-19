@@ -107,6 +107,7 @@ export default function CardsManager({ entries, onChange, categories }: { entrie
   const [manualDescription, setManualDescription] = useState("");
   const [manualAmount, setManualAmount] = useState("");
   const [manualInstallments, setManualInstallments] = useState(1);
+  const [manualInvoiceOffset, setManualInvoiceOffset] = useState<1 | 2>(1);
   const [manualError, setManualError] = useState("");
   const [manualSuccess, setManualSuccess] = useState("");
   function addManualPurchase() {
@@ -128,7 +129,7 @@ export default function CardsManager({ entries, onChange, categories }: { entrie
     const remainder = total % manualInstallments;
     const created: CardEntry[] = Array.from({ length: manualInstallments }, (_, index) => ({
       id: crypto.randomUUID(), card: manualCard,
-      date: new Date(Date.UTC(year, month + index, 8)).toISOString().slice(0, 10),
+      date: new Date(Date.UTC(year, month + manualInvoiceOffset - 1 + index, manualCard === "Inter Crédito" ? 7 : 8)).toISOString().slice(0, 10),
       description: manualDescription.trim() + (manualInstallments > 1 ? " - Parcela " + (index + 1) + "/" + manualInstallments : ""),
       amountCents: base + (index < remainder ? 1 : 0),
       importKey: "manual-card:" + groupId + ":" + (index + 1),
@@ -246,7 +247,19 @@ export default function CardsManager({ entries, onChange, categories }: { entrie
           <label className="text-xs font-medium text-[#64748B]">Valor total (R$)<input value={manualAmount} onChange={(e) => setManualAmount(e.target.value)} inputMode="decimal" placeholder="700,00" className="mt-1 block w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-3 text-sm" /></label>
           <label className="text-xs font-medium text-[#64748B]">Parcelas (1 a 48)<input type="number" min={1} max={48} step={1} value={manualInstallments} onChange={(e) => setManualInstallments(Number(e.target.value))} className="mt-1 block w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-3 text-sm" /></label>
         </div>
-        <p className="mt-3 text-xs text-[#77879B]">Regra provisória: primeira fatura no mês seguinte, vencimento dia 8. Configuração do fechamento e vencimento por cartão ainda será adicionada. Não utilize para compras reais antes dessa configuração.</p>
+        <div className="mt-4 space-y-2">
+          <p className="text-xs font-medium text-[#64748B]">Primeira fatura</p>
+          <div className="flex flex-wrap justify-center gap-3">
+            {([1, 2] as const).map((offset) => {
+              const [year, month] = manualDate.split("-").map(Number);
+              const valid = Number.isInteger(year) && Number.isInteger(month) && month >= 1 && month <= 12;
+              const label = valid ? new Date(Date.UTC(year, month + offset - 1, 1)).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" }) : offset === 1 ? "Próxima fatura" : "Fatura posterior";
+              return <button key={offset} type="button" aria-pressed={manualInvoiceOffset === offset} onClick={() => setManualInvoiceOffset(offset)}
+                className={`min-h-12 w-44 rounded-2xl border px-4 py-3 text-sm font-semibold backdrop-blur-xl ${manualInvoiceOffset === offset ? "border-sky-400/80 bg-sky-200/75 text-sky-950 shadow-md" : "border-white/80 bg-white/60 text-[#64748B]"}`}>{label}{manualInvoiceOffset === offset ? " ✓" : ""}</button>;
+            })}
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-[#77879B]">A primeira fatura é sugerida para o mês seguinte à compra, com opção de adiar um mês. Vencimento: Nubank dia 08 e Inter dia 07. Confirme com a fatura oficial; a regra de corte é aproximada.</p>
         {manualError && <p role="alert" className="mt-3 text-sm text-rose-700">{manualError}</p>}
         {manualSuccess && <p role="status" className="mt-3 text-sm text-emerald-700">{manualSuccess}</p>}
         <button type="button" onClick={addManualPurchase} className="mt-4 rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white hover:bg-[#25282D]">Registrar compra</button>
