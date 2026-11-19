@@ -238,7 +238,7 @@ export default function DriveSettings({ transactions, accounts }: { transactions
   }
 
   const previewAccount = preview ? accounts.find((account) =>
-    preview.folderPath.endsWith("/" + account.name.toUpperCase())
+    preview.folderPath.split(" / ").pop()?.toLocaleUpperCase("pt-BR") === account.name.toLocaleUpperCase("pt-BR")
   ) : undefined;
   const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
   const classified = preview?.entries.map((entry) => {
