@@ -22,7 +22,8 @@ export function parseMoneyToCents(value: string): number {
     throw new Error("O valor informado é muito alto.");
   }
 
-  return valueInCents;
+  // Evita o zero negativo (-0), que seria exibido como "-R$ 0,00".
+  return valueInCents === 0 ? 0 : valueInCents;
 }
 
 export function formatCents(cents: number): string {

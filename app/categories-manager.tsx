@@ -1,19 +1,13 @@
 "use client";
 
 import { useState } from "react";
-
-export type CategoryType = "income" | "expense" | "transfer";
-
-export type Category = {
-  id: string;
-  name: string;
-  type: CategoryType;
-  subcategories: string[];
-};
+import { newId, type Category, type CategoryType } from "./categories";
 
 type Props = {
   categories: Category[];
   onChange: (categories: Category[]) => void;
+  isCategoryInUse: (categoryId: string) => boolean;
+  isSubcategoryInUse: (subcategoryId: string) => boolean;
 };
 
 const typeLabels: Record<CategoryType, string> = {
@@ -28,13 +22,18 @@ const typeStyles: Record<CategoryType, string> = {
   transfer: "bg-blue-50 text-blue-700",
 };
 
-export default function CategoriesManager({ categories, onChange }: Props) {
+export default function CategoriesManager({
+  categories,
+  onChange,
+  isCategoryInUse,
+  isSubcategoryInUse,
+}: Props) {
   const [name, setName] = useState("");
   const [type, setType] = useState<CategoryType>("expense");
   const [subcategoryDrafts, setSubcategoryDrafts] = useState<Record<string, string>>({});
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
-  const [editingSubcategory, setEditingSubcategory] = useState<{ categoryId: string; originalName: string } | null>(null);
+  const [editingSubcategory, setEditingSubcategory] = useState<{ categoryId: string; subcategoryId: string } | null>(null);
   const [editingSubcategoryName, setEditingSubcategoryName] = useState("");
   const [error, setError] = useState("");
 
@@ -61,7 +60,7 @@ export default function CategoriesManager({ categories, onChange }: Props) {
     }
 
     const created: Category = {
-      id: `category-${Date.now()}`,
+      id: newId("category"),
       name: cleanName,
       type,
       subcategories: [],
@@ -99,6 +98,12 @@ export default function CategoriesManager({ categories, onChange }: Props) {
   }
 
   function removeCategory(category: Category) {
+    if (isCategoryInUse(category.id)) {
+      alert(
+        `A categoria "${category.name}" possui lançamentos vinculados. Altere a categoria desses lançamentos antes de excluí-la.`
+      );
+      return;
+    }
     if (!confirm(`Excluir a categoria "${category.name}" e suas subcategorias?`)) return;
     onChange(categories.filter((item) => item.id !== category.id));
     if (editingCategoryId === category.id) setEditingCategoryId(null);
@@ -108,22 +113,22 @@ export default function CategoriesManager({ categories, onChange }: Props) {
     const clean = (subcategoryDrafts[categoryId] ?? "").trim();
     const category = categories.find((item) => item.id === categoryId);
     if (!category || !clean) return;
-    if (category.subcategories.some((item) => item.toLocaleLowerCase("pt-BR") === clean.toLocaleLowerCase("pt-BR"))) {
+    if (category.subcategories.some((item) => item.name.toLocaleLowerCase("pt-BR") === clean.toLocaleLowerCase("pt-BR"))) {
       setError("Essa subcategoria já existe nesta categoria.");
       return;
     }
     onChange(categories.map((item) =>
       item.id === categoryId
-        ? { ...item, subcategories: [...item.subcategories, clean] }
+        ? { ...item, subcategories: [...item.subcategories, { id: newId("sub"), name: clean }] }
         : item
     ));
     setSubcategoryDrafts((drafts) => ({ ...drafts, [categoryId]: "" }));
     setError("");
   }
 
-  function startEditingSubcategory(categoryId: string, value: string) {
-    setEditingSubcategory({ categoryId, originalName: value });
-    setEditingSubcategoryName(value);
+  function startEditingSubcategory(categoryId: string, subcategoryId: string, currentName: string) {
+    setEditingSubcategory({ categoryId, subcategoryId });
+    setEditingSubcategoryName(currentName);
     setError("");
   }
 
@@ -138,8 +143,8 @@ export default function CategoriesManager({ categories, onChange }: Props) {
     if (!category) return;
     const duplicate = category.subcategories.some(
       (item) =>
-        item !== editingSubcategory.originalName &&
-        item.toLocaleLowerCase("pt-BR") === clean.toLocaleLowerCase("pt-BR")
+        item.id !== editingSubcategory.subcategoryId &&
+        item.name.toLocaleLowerCase("pt-BR") === clean.toLocaleLowerCase("pt-BR")
     );
     if (duplicate) {
       setError("Essa subcategoria já existe nesta categoria.");
@@ -150,7 +155,7 @@ export default function CategoriesManager({ categories, onChange }: Props) {
         ? {
             ...item,
             subcategories: item.subcategories.map((sub) =>
-              sub === editingSubcategory.originalName ? clean : sub
+              sub.id === editingSubcategory.subcategoryId ? { ...sub, name: clean } : sub
             ),
           }
         : item
@@ -160,13 +165,19 @@ export default function CategoriesManager({ categories, onChange }: Props) {
     setError("");
   }
 
-  function removeSubcategory(categoryId: string, value: string) {
+  function removeSubcategory(categoryId: string, subcategoryId: string, name: string) {
+    if (isSubcategoryInUse(subcategoryId)) {
+      alert(
+        `A subcategoria "${name}" possui lançamentos vinculados. Altere a subcategoria desses lançamentos antes de excluí-la.`
+      );
+      return;
+    }
     onChange(categories.map((category) =>
       category.id === categoryId
-        ? { ...category, subcategories: category.subcategories.filter((item) => item !== value) }
+        ? { ...category, subcategories: category.subcategories.filter((item) => item.id !== subcategoryId) }
         : category
     ));
-    if (editingSubcategory?.categoryId === categoryId && editingSubcategory.originalName === value) {
+    if (editingSubcategory?.categoryId === categoryId && editingSubcategory.subcategoryId === subcategoryId) {
       setEditingSubcategory(null);
     }
   }
@@ -244,9 +255,9 @@ export default function CategoriesManager({ categories, onChange }: Props) {
                     </div>
                     <div className="ml-2 mt-3 space-y-2 border-l-2 border-[#DCE5EF] pl-3">
                       {category.subcategories.length > 0 ? category.subcategories.map((item) => (
-                        <div key={item} className="flex items-center gap-2 rounded-lg px-2 py-1.5">
+                        <div key={item.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5">
                           <span className="text-xs text-[#A4B3C5]">↳</span>
-                          {editingSubcategory?.categoryId === category.id && editingSubcategory.originalName === item ? (
+                          {editingSubcategory?.categoryId === category.id && editingSubcategory.subcategoryId === item.id ? (
                             <div className="min-w-0 flex-1 space-y-2">
                               <input
                                 autoFocus
@@ -263,9 +274,9 @@ export default function CategoriesManager({ categories, onChange }: Props) {
                             </div>
                           ) : (
                             <>
-                              <span className="min-w-0 flex-1 text-sm text-[#52627A]">{item}</span>
-                              <button onClick={() => startEditingSubcategory(category.id, item)} className="rounded-lg border border-[#DCE5EF] bg-white/80 px-3 py-1.5 text-xs font-medium text-[#526B8B] hover:bg-white">✎ Editar</button>
-                              <button onClick={() => removeSubcategory(category.id, item)} className="rounded-lg px-2 py-1.5 text-xs text-rose-500 hover:bg-rose-50">Excluir</button>
+                              <span className="min-w-0 flex-1 text-sm text-[#52627A]">{item.name}</span>
+                              <button onClick={() => startEditingSubcategory(category.id, item.id, item.name)} className="rounded-lg border border-[#DCE5EF] bg-white/80 px-3 py-1.5 text-xs font-medium text-[#526B8B] hover:bg-white">✎ Editar</button>
+                              <button onClick={() => removeSubcategory(category.id, item.id, item.name)} className="rounded-lg px-2 py-1.5 text-xs text-rose-500 hover:bg-rose-50">Excluir</button>
                             </>
                           )}
                         </div>

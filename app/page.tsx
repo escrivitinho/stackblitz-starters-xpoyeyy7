@@ -2,9 +2,18 @@
 "use client";
 
 import { useState } from "react";
-import CategoriesManager, { type Category } from "./categories-manager";
+import CategoriesManager from "./categories-manager";
+import {
+  getTransactionCategoryLabel,
+  getTransactionCategoryName,
+  initialCategories,
+  isCategoryInUse,
+  isSubcategoryInUse,
+  type Category,
+} from "./categories";
 import { formatCents, parseMoneyToCents } from "./lib/money";
 import {
+  calculateAccountBalance,
   calculateTransactionTotals,
   type Transaction,
   type TransactionType,
@@ -14,7 +23,8 @@ type Account = {
   id: number;
   name: string;
   type: string;
-  balanceCents: number | null;
+  openingBalanceCents: number | null;
+  openingBalanceDate: string | null; // AAAA-MM-DD
   source: "manual" | "statement" | "pending";
 };
 
@@ -23,21 +33,24 @@ const initialAccounts: Account[] = [
     id: 1,
     name: "Nubank",
     type: "Conta corrente",
-    balanceCents: 123456,
+    openingBalanceCents: 123456,
+    openingBalanceDate: "2026-01-01",
     source: "manual",
   },
   {
     id: 2,
     name: "Inter",
     type: "Conta corrente",
-    balanceCents: null,
+    openingBalanceCents: null,
+    openingBalanceDate: null,
     source: "pending",
   },
   {
     id: 3,
     name: "Caixa",
     type: "Conta corrente",
-    balanceCents: null,
+    openingBalanceCents: null,
+    openingBalanceDate: null,
     source: "pending",
   },
 ];
@@ -54,21 +67,12 @@ const navigation = [
   { name: "Relatórios", icon: "▥" },
 ];
 
-const initialCategories: Category[] = [
-  { id: "expense-housing", name: "Moradia", type: "expense", subcategories: ["Aluguel", "Condomínio", "Energia", "Água", "Internet"] },
-  { id: "expense-food", name: "Alimentação", type: "expense", subcategories: ["Supermercado", "Restaurante", "Delivery"] },
-  { id: "expense-transport", name: "Transporte", type: "expense", subcategories: ["Combustível", "Aplicativos", "Transporte público"] },
-  { id: "expense-health", name: "Saúde", type: "expense", subcategories: ["Farmácia", "Consultas", "Exames"] },
-  { id: "expense-leisure", name: "Lazer", type: "expense", subcategories: ["Viagens", "Entretenimento", "Assinaturas"] },
-  { id: "expense-other", name: "Outros", type: "expense", subcategories: ["Compras diversas", "Presentes", "Outros"] },
-  { id: "income-salary", name: "Salário", type: "income", subcategories: ["Salário CLT", "Royalties", "Adiantamento"] },
-  { id: "income-investments", name: "Investimentos", type: "income", subcategories: ["Rendimentos", "Dividendos", "Juros"] },
-  { id: "income-other", name: "Outros", type: "income", subcategories: ["Reembolso", "Venda", "Outras receitas"] },
-  { id: "transfer-general", name: "Transferência", type: "transfer", subcategories: ["Entre contas"] },
-];
-
-function money(cents: number | null) {
+function money(cents: number) {
   return formatCents(cents);
+}
+
+function balanceLabel(cents: number | null) {
+  return cents === null ? "Aguardando saldo inicial" : money(cents);
 }
 
 function AccountLogo({ name }: { name: string }) {
@@ -117,8 +121,8 @@ export default function Home() {
     useState<Transaction[]>(initialTransactions);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
 
-  const [selectedAccount, setSelectedAccount] =
-    useState<Account | null>(null);
+  const [selectedAccountId, setSelectedAccountId] =
+    useState<number | null>(null);
 
   // Formulário de contas
   const [showAccountForm, setShowAccountForm] = useState(false);
@@ -126,6 +130,7 @@ export default function Home() {
   const [accountType, setAccountType] = useState("Conta corrente");
   const [balanceMethod, setBalanceMethod] = useState("manual");
   const [initialBalance, setInitialBalance] = useState("");
+  const [initialBalanceDate, setInitialBalanceDate] = useState(todayISO());
   const [accountError, setAccountError] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
 
@@ -138,35 +143,45 @@ export default function Home() {
   const [transactionAmount, setTransactionAmount] = useState("");
   const [transactionAccount, setTransactionAccount] = useState("1");
   const [transferDestination, setTransferDestination] = useState("2");
-  const [transactionGroup, setTransactionGroup] = useState("Moradia");
-  const [transactionSubcategory, setTransactionSubcategory] =
-    useState("Aluguel");
+  const [transactionCategoryId, setTransactionCategoryId] = useState(
+    initialCategories.find((category) => category.type === "expense")?.id ?? ""
+  );
+  const [transactionSubcategoryId, setTransactionSubcategoryId] = useState(
+    initialCategories.find((category) => category.type === "expense")
+      ?.subcategories[0]?.id ?? ""
+  );
   const [paidFor, setPaidFor] = useState("");
   const [transactionError, setTransactionError] = useState("");
 
+  // Saldo atual = saldo inicial + lançamentos desde a data do saldo inicial.
+  const balanceOf = (account: Account) =>
+    calculateAccountBalance(account, transactions);
+
+  const selectedAccount =
+    accounts.find((account) => account.id === selectedAccountId) ?? null;
+
   const totalBalanceCents = accounts.reduce(
-    (total, account) => total + (account.balanceCents ?? 0),
+    (total, account) => total + (balanceOf(account) ?? 0),
     0
   );
 
   const accountsWithBalance = accounts.filter(
-    (account) => account.balanceCents !== null
+    (account) => account.openingBalanceCents !== null
   ).length;
 
   const totals = calculateTransactionTotals(transactions);
 
-  const availableGroups = categories
-    .filter((category) => category.type === transactionType)
-    .reduce<Record<string, string[]>>((groups, category) => {
-      groups[category.name] = category.subcategories;
-      return groups;
-    }, {});
+  const availableCategories = categories.filter(
+    (category) => category.type === transactionType
+  );
 
-  const availableSubcategories = availableGroups[transactionGroup] || [];
+  const availableSubcategories =
+    availableCategories.find((category) => category.id === transactionCategoryId)
+      ?.subcategories ?? [];
 
   function goToPage(page: string) {
     setActive(page);
-    setSelectedAccount(null);
+    setSelectedAccountId(null);
     setShowAccountForm(false);
     setShowTransactionForm(false);
   }
@@ -181,6 +196,7 @@ export default function Home() {
     setAccountType("Conta corrente");
     setBalanceMethod("manual");
     setInitialBalance("");
+    setInitialBalanceDate(todayISO());
     setAccountError("");
     setEditingId(null);
   }
@@ -193,7 +209,8 @@ export default function Home() {
       return;
     }
 
-    let balanceCents: number | null = null;
+    let openingBalanceCents: number | null = null;
+    let openingBalanceDate: string | null = null;
 
     if (balanceMethod === "manual") {
       if (!initialBalance.trim()) {
@@ -201,27 +218,31 @@ export default function Home() {
         return;
       }
 
-      const parsed = parseMoneyToCents(initialBalance);
+      if (!initialBalanceDate) {
+        setAccountError("Informe a data do saldo inicial.");
+        return;
+      }
 
-      if (parsed === null) {
+      try {
+        openingBalanceCents = parseMoneyToCents(initialBalance);
+      } catch (error) {
         setAccountError(
-          "Valor inválido. Use formatos como 1500,00 ou 1.500,00."
+          error instanceof Error
+            ? error.message
+            : "Valor inválido. Use formatos como 1500,00 ou 1.500,00."
         );
         return;
       }
 
-      balanceCents = parsed;
+      openingBalanceDate = initialBalanceDate;
     }
-
-    const existingAccount = accounts.find(
-      (account) => account.id === editingId
-    );
 
     const newAccount: Account = {
       id: editingId ?? Date.now(),
       name: accountName.trim(),
       type: accountType,
-      balanceCents,
+      openingBalanceCents,
+      openingBalanceDate,
       source:
         balanceMethod === "manual" ? "manual" : "pending",
     };
@@ -233,9 +254,6 @@ export default function Home() {
         )
       );
 
-      if (selectedAccount?.id === editingId) {
-        setSelectedAccount(newAccount);
-      }
     } else {
       setAccounts((current) => [...current, newAccount]);
     }
@@ -251,14 +269,15 @@ export default function Home() {
     );
 
     setInitialBalance(
-      account.balanceCents === null
+      account.openingBalanceCents === null
         ? ""
-        : (account.balanceCents / 100).toLocaleString("pt-BR", {
+        : (account.openingBalanceCents / 100).toLocaleString("pt-BR", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })
     );
 
+    setInitialBalanceDate(account.openingBalanceDate ?? todayISO());
     setEditingId(account.id);
     setAccountError("");
     setShowAccountForm(true);
@@ -288,8 +307,8 @@ export default function Home() {
         current.filter((account) => account.id !== id)
       );
 
-      if (selectedAccount?.id === id) {
-        setSelectedAccount(null);
+      if (selectedAccountId === id) {
+        setSelectedAccountId(null);
       }
     }
   }
@@ -309,8 +328,8 @@ export default function Home() {
       String(accounts[1]?.id ?? accounts[0]?.id ?? "")
     );
     const firstExpense = categories.find((category) => category.type === "expense");
-    setTransactionGroup(firstExpense?.name || "");
-    setTransactionSubcategory(firstExpense?.subcategories[0] || "");
+    setTransactionCategoryId(firstExpense?.id ?? "");
+    setTransactionSubcategoryId(firstExpense?.subcategories[0]?.id ?? "");
     setPaidFor("");
     setTransactionError("");
   }
@@ -320,8 +339,8 @@ export default function Home() {
     setTransactionError("");
 
     const firstCategory = categories.find((category) => category.type === type);
-    setTransactionGroup(firstCategory?.name || "");
-    setTransactionSubcategory(firstCategory?.subcategories[0] || "");
+    setTransactionCategoryId(firstCategory?.id ?? "");
+    setTransactionSubcategoryId(firstCategory?.subcategories[0]?.id ?? "");
   }
 
   function saveTransaction() {
@@ -337,12 +356,21 @@ export default function Home() {
       return;
     }
 
-    const amountCents = parseMoneyToCents(transactionAmount);
+    let amountCents: number;
 
-    if (amountCents === null || amountCents <= 0) {
+    try {
+      amountCents = parseMoneyToCents(transactionAmount);
+    } catch (error) {
       setTransactionError(
-        "Informe um valor válido e maior que zero. Ex.: 150,00."
+        error instanceof Error
+          ? error.message
+          : "Informe um valor válido. Ex.: 150,00."
       );
+      return;
+    }
+
+    if (amountCents <= 0) {
+      setTransactionError("Informe um valor maior que zero. Ex.: 150,00.");
       return;
     }
 
@@ -358,17 +386,36 @@ export default function Home() {
       date: transactionDate,
       amountCents,
       description: transactionDescription.trim(),
-      group:
-        transactionType === "transfer"
-          ? "Transferência"
-          : transactionGroup,
-      subcategory:
-        transactionType === "transfer"
-          ? "Entre contas"
-          : transactionSubcategory,
       source: "manual" as const,
       ...(paidFor.trim() ? { paidFor: paidFor.trim() } : {}),
     };
+
+    // Receitas e despesas precisam de categoria (por id); transferências não.
+    function resolveCategory() {
+      const category = categories.find(
+        (item) =>
+          item.id === transactionCategoryId && item.type === transactionType
+      );
+
+      if (!category) {
+        setTransactionError("Selecione uma categoria válida.");
+        return null;
+      }
+
+      const subcategory = category.subcategories.find(
+        (item) => item.id === transactionSubcategoryId
+      );
+
+      if (category.subcategories.length > 0 && !subcategory) {
+        setTransactionError("Selecione uma subcategoria.");
+        return null;
+      }
+
+      return {
+        categoryId: category.id,
+        ...(subcategory ? { subcategoryId: subcategory.id } : {}),
+      };
+    }
 
     let newTransaction: Transaction;
 
@@ -392,16 +439,24 @@ export default function Home() {
         toAccountId: destinationId,
       };
     } else if (transactionType === "income") {
+      const categoryFields = resolveCategory();
+      if (!categoryFields) return;
+
       newTransaction = {
         ...common,
         type: "income",
         accountId,
+        ...categoryFields,
       };
     } else {
+      const categoryFields = resolveCategory();
+      if (!categoryFields) return;
+
       newTransaction = {
         ...common,
         type: "expense",
         accountId,
+        ...categoryFields,
       };
     }
 
@@ -624,7 +679,7 @@ export default function Home() {
                     <div key={transaction.id} className="flex justify-between gap-3 border-b border-[#EDF0F4] py-3 last:border-0">
                       <div>
                         <p className="text-sm font-medium text-[#35445A]">{transaction.description}</p>
-                        <p className="text-xs text-[#94A0AF]">{displayDate(transaction.date)} · {transaction.group}</p>
+                        <p className="text-xs text-[#94A0AF]">{displayDate(transaction.date)} · {getTransactionCategoryName(categories, transaction)}</p>
                       </div>
                       <span className={`text-sm font-semibold ${transaction.type === "income" ? "text-emerald-700" : "text-[#526176]"}`}>
                         {transaction.type === "income" ? "+" : transaction.type === "expense" ? "−" : ""}
@@ -793,17 +848,19 @@ export default function Home() {
                       <label className="space-y-2">
                         <span className="text-xs font-medium text-[#64748B]">Categoria</span>
                         <select
-                          value={transactionGroup}
+                          value={transactionCategoryId}
                           onChange={(e) => {
-                            setTransactionGroup(e.target.value);
-                            setTransactionSubcategory(
-                              (availableGroups[e.target.value] || [])[0] || ""
+                            setTransactionCategoryId(e.target.value);
+                            setTransactionSubcategoryId(
+                              availableCategories.find(
+                                (category) => category.id === e.target.value
+                              )?.subcategories[0]?.id ?? ""
                             );
                           }}
                           className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none"
                         >
-                          {Object.keys(availableGroups).map((group) => (
-                            <option key={group} value={group}>{group}</option>
+                          {availableCategories.map((category) => (
+                            <option key={category.id} value={category.id}>{category.name}</option>
                           ))}
                         </select>
                       </label>
@@ -811,12 +868,12 @@ export default function Home() {
                       <label className="space-y-2">
                         <span className="text-xs font-medium text-[#64748B]">Subcategoria</span>
                         <select
-                          value={transactionSubcategory}
-                          onChange={(e) => setTransactionSubcategory(e.target.value)}
+                          value={transactionSubcategoryId}
+                          onChange={(e) => setTransactionSubcategoryId(e.target.value)}
                           className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none"
                         >
                           {availableSubcategories.map((subcategory) => (
-                            <option key={subcategory} value={subcategory}>{subcategory}</option>
+                            <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>
                           ))}
                         </select>
                       </label>
@@ -914,7 +971,7 @@ export default function Home() {
                             {transaction.description}
                           </p>
                           <p className="mt-1 text-xs text-[#94A0AF]">
-                            {transaction.group} · {transaction.subcategory}
+                            {getTransactionCategoryLabel(categories, transaction)}
                           </p>
                           <p className="mt-1 text-[11px] text-[#A0AABA]">
                             {displayDate(transaction.date)} · {getTransactionAccountName(transaction)}
@@ -962,7 +1019,7 @@ export default function Home() {
         {active === "Contas" && selectedAccount && (
           <div className="space-y-6">
             <button
-              onClick={() => setSelectedAccount(null)}
+              onClick={() => setSelectedAccountId(null)}
               className="flex items-center gap-2 rounded-xl border border-white/90 bg-white/60 px-4 py-2.5 text-sm font-medium text-[#526B8B] shadow-sm backdrop-blur-xl hover:bg-white"
             >
               ← Voltar para minhas contas
@@ -988,11 +1045,12 @@ export default function Home() {
 
               <p className="mt-8 text-xs font-medium uppercase tracking-wider text-[#8494A8]">Saldo atual</p>
               <h3 className="mt-2 text-4xl font-semibold tracking-tight text-[#233C5B]">
-                {money(selectedAccount.balanceCents)}
+                {balanceLabel(balanceOf(selectedAccount))}
               </h3>
               <p className="mt-3 text-xs text-[#8B9AAD]">
-                {selectedAccount.source === "manual"
-                  ? "Saldo cadastrado manualmente"
+                {selectedAccount.source === "manual" &&
+                selectedAccount.openingBalanceCents !== null
+                  ? `Saldo inicial de ${money(selectedAccount.openingBalanceCents)} em ${displayDate(selectedAccount.openingBalanceDate ?? "")}, mais os lançamentos desde então`
                   : selectedAccount.source === "statement"
                   ? "Saldo calculado por extrato"
                   : "Aguardando informação de saldo"}
@@ -1029,7 +1087,7 @@ export default function Home() {
                       <div>
                         <p className="text-sm font-medium text-[#35445A]">{transaction.description}</p>
                         <p className="mt-1 text-xs text-[#94A0AF]">
-                          {transaction.group} · {displayDate(transaction.date)}
+                          {getTransactionCategoryName(categories, transaction)} · {displayDate(transaction.date)}
                         </p>
                       </div>
                       <p className={`text-sm font-semibold ${
@@ -1134,7 +1192,7 @@ export default function Home() {
                     >
                       <span className="text-lg">✎</span>
                       <p className="mt-2 text-sm font-semibold text-[#354B68]">Informar manualmente</p>
-                      <p className="mt-1 text-xs text-[#8998AA]">Digitar o saldo atual da conta.</p>
+                      <p className="mt-1 text-xs text-[#8998AA]">Digitar o saldo da conta em uma data de referência.</p>
                     </button>
                     <button
                       type="button"
@@ -1151,19 +1209,36 @@ export default function Home() {
                 </div>
 
                 {balanceMethod === "manual" && (
-                  <label className="mt-5 block space-y-2">
-                    <span className="text-xs font-medium text-[#64748B]">Saldo inicial (R$)</span>
-                    <input
-                      value={initialBalance}
-                      onChange={(e) => {
-                        setInitialBalance(e.target.value);
-                        setAccountError("");
-                      }}
-                      placeholder="Ex.: 1.500,00"
-                      inputMode="decimal"
-                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#7898BF] md:max-w-sm"
-                    />
-                  </label>
+                  <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <label className="block space-y-2">
+                      <span className="text-xs font-medium text-[#64748B]">Saldo inicial (R$)</span>
+                      <input
+                        value={initialBalance}
+                        onChange={(e) => {
+                          setInitialBalance(e.target.value);
+                          setAccountError("");
+                        }}
+                        placeholder="Ex.: 1.500,00"
+                        inputMode="decimal"
+                        className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#7898BF]"
+                      />
+                    </label>
+                    <label className="block space-y-2">
+                      <span className="text-xs font-medium text-[#64748B]">Data do saldo inicial</span>
+                      <input
+                        type="date"
+                        value={initialBalanceDate}
+                        onChange={(e) => {
+                          setInitialBalanceDate(e.target.value);
+                          setAccountError("");
+                        }}
+                        className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#7898BF]"
+                      />
+                      <p className="text-xs text-[#94A0AF]">
+                        Os lançamentos a partir desta data entram no cálculo do saldo atual.
+                      </p>
+                    </label>
+                  </div>
                 )}
 
                 {balanceMethod === "statement" && (
@@ -1197,7 +1272,7 @@ export default function Home() {
                 <div key={account.id} className="group relative overflow-hidden rounded-3xl border border-white/90 bg-white/65 p-5 shadow-[0_8px_32px_rgba(80,110,150,0.07)] backdrop-blur-2xl transition hover:shadow-[0_12px_38px_rgba(80,110,150,0.13)]">
                   <div className="pointer-events-none absolute -right-12 -top-16 h-40 w-40 rounded-full bg-sky-100/70 blur-[60px]" />
                   <div className="relative flex items-start justify-between gap-3">
-                    <button onClick={() => setSelectedAccount(account)} className="flex items-center gap-3 text-left">
+                    <button onClick={() => setSelectedAccountId(account.id)} className="flex items-center gap-3 text-left">
                       <AccountLogo name={account.name} />
                       <div>
                         <h4 className="font-semibold text-[#2D405A]">{account.name}</h4>
@@ -1211,7 +1286,7 @@ export default function Home() {
                   <div className="relative mt-7 border-t border-[#E9EEF4] pt-5">
                     <p className="text-xs text-[#8A98AA]">Saldo da conta</p>
                     <p className="mt-2 text-2xl font-semibold tracking-tight text-[#263D59]">
-                      {money(account.balanceCents)}
+                      {balanceLabel(balanceOf(account))}
                     </p>
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                       <span className="rounded-full border border-blue-100 bg-blue-50/70 px-3 py-1.5 text-[10px] font-medium text-blue-700">
@@ -1221,7 +1296,7 @@ export default function Home() {
                         Excluir conta
                       </button>
                     </div>
-                    <button onClick={() => setSelectedAccount(account)} className="mt-5 w-full rounded-xl border border-[#DCE5EF] bg-white/60 px-4 py-3 text-xs font-semibold text-[#526B8B] transition hover:bg-white">
+                    <button onClick={() => setSelectedAccountId(account.id)} className="mt-5 w-full rounded-xl border border-[#DCE5EF] bg-white/60 px-4 py-3 text-xs font-semibold text-[#526B8B] transition hover:bg-white">
                       Ver detalhes da conta →
                     </button>
                   </div>
@@ -1236,7 +1311,12 @@ export default function Home() {
         {/* ================================== */}
 
         {active === "Categorias" && (
-          <CategoriesManager categories={categories} onChange={setCategories} />
+          <CategoriesManager
+            categories={categories}
+            onChange={setCategories}
+            isCategoryInUse={(categoryId) => isCategoryInUse(transactions, categoryId)}
+            isSubcategoryInUse={(subcategoryId) => isSubcategoryInUse(transactions, subcategoryId)}
+          />
         )}
 
         {!["Visão geral", "Contas", "Lançamentos", "Categorias"].includes(active) && (
