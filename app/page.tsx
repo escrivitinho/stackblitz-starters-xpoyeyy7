@@ -976,7 +976,7 @@ if (amountCents <= 0) {
                     <div className="mb-5 space-y-2">
                       <span className="text-xs font-medium text-[#64748B]">Forma de pagamento</span>
                       <div className="grid grid-cols-2 gap-3">
-                        <button type="button" onClick={() => setPaymentMethod("debit")} className={paymentMethod === "debit" ? "rounded-2xl border border-sky-300 bg-sky-100/70 px-4 py-3 text-sm backdrop-blur-xl" : "rounded-2xl border border-white/80 bg-white/60 px-4 py-3 text-sm backdrop-blur-xl"}>Débito / conta</button>
+                        <button type="button" onClick={() => setPaymentMethod("debit")} className={paymentMethod === "debit" ? "rounded-2xl border border-sky-300 bg-sky-100/70 px-4 py-3 text-sm backdrop-blur-xl" : "rounded-2xl border border-white/80 bg-white/60 px-4 py-3 text-sm backdrop-blur-xl"}>Débito / Pix</button>
                         <button type="button" onClick={() => setPaymentMethod("credit")} className={paymentMethod === "credit" ? "rounded-2xl border border-sky-300 bg-sky-100/70 px-4 py-3 text-sm backdrop-blur-xl" : "rounded-2xl border border-white/80 bg-white/60 px-4 py-3 text-sm backdrop-blur-xl"}>Crédito</button>
                       </div>
                     </div>
