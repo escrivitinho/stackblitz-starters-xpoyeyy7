@@ -602,6 +602,8 @@ if (amountCents <= 0) {
       const category = categories.find((item) => item.type === "expense" && item.name === transactionGroup);
       const created: CardEntry[] = Array.from({ length: installments }, (_, index) => ({
         id: crypto.randomUUID(), card: selectedCreditCard,
+        purchaseDate: transactionDate,
+        paidFor: paidFor.trim() || undefined,
         date: new Date(Date.UTC(year, month - 1 + index, selectedCreditCard === "Inter Crédito" ? 7 : 8)).toISOString().slice(0, 10),
         description: transactionDescription.trim() + (installments > 1 ? " - Parcela " + (index + 1) + "/" + installments : ""),
         amountCents: base + (index < remainder ? 1 : 0),
