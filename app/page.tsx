@@ -162,6 +162,32 @@ export default function Home() {
   const [cardEntries, setCardEntries] = useState<CardEntry[]>([]);
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
   const [transactionTab, setTransactionTab] = useState<"all" | "pending">("all");
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editCategoryId, setEditCategoryId] = useState("");
+  const [editSubcategoryId, setEditSubcategoryId] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editPaidFor, setEditPaidFor] = useState("");
+  const editItem = transactions.find((item) => item.id === editId);
+  const editCategories = categories.filter((item) => item.type === (editItem?.type === "income" ? "income" : "expense"));
+  const editCategory = editCategories.find((item) => item.id === editCategoryId);
+  function startEdit(item: Transaction) {
+    setEditId(item.id);
+    setEditCategoryId(item.categoryId || "");
+    setEditSubcategoryId(item.subcategoryId || "");
+    setEditDescription(item.description);
+    setEditPaidFor(item.paidFor || "");
+  }
+  function saveEdit() {
+    const category = editCategories.find((item) => item.id === editCategoryId);
+    const subcategory = category?.subcategories.find((item) => item.id === editSubcategoryId);
+    setTransactions((current) => current.map((item) => item.id === editId ? { ...item,
+      description: editDescription.trim() || item.description, paidFor: editPaidFor.trim(),
+      categoryId: category?.id, subcategoryId: subcategory?.id,
+      group: category?.name || item.group, subcategory: subcategory?.name || (category ? "" : item.subcategory)
+    } : item));
+    setEditId(null);
+  }
+
   // Persistência local: carregar após a hidratação e só salvar depois da leitura.
   const [storageLoaded, setStorageLoaded] = useState(false);
   const [backupMessage, setBackupMessage] = useState("");
@@ -1218,6 +1244,20 @@ if (amountCents <= 0) {
                   </div>;
                 })}</div>}
             </div>}
+            {editItem && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm" onClick={() => setEditId(null)}>
+              <div role="dialog" aria-modal="true" aria-label="Classificar lançamento" onClick={(event) => event.stopPropagation()} className="w-full max-w-xl space-y-4 rounded-3xl border border-white bg-[#F8FAFD] p-6 shadow-2xl">
+                <h3 className="text-lg font-semibold text-[#26364D]">Classificar lançamento</h3>
+                <p className="text-xs text-[#64748B]">{displayDate(editItem.date)} · {getTransactionAccountName(editItem)} · {money(editItem.amountCents)}</p>
+                <label className="block space-y-2"><span className="text-xs text-[#64748B]">Descrição</span><input value={editDescription} onChange={(event) => setEditDescription(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-3 text-sm" /></label>
+                {editItem.type !== "transfer" && <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block space-y-2"><span className="text-xs text-[#64748B]">Categoria</span><select value={editCategoryId} onChange={(event) => { setEditCategoryId(event.target.value); setEditSubcategoryId(""); }} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-3 text-sm"><option value="">Selecione</option>{editCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                  <label className="block space-y-2"><span className="text-xs text-[#64748B]">Subcategoria</span><select value={editSubcategoryId} onChange={(event) => setEditSubcategoryId(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-3 text-sm"><option value="">Selecione</option>{editCategory?.subcategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                </div>}
+                <label className="block space-y-2"><span className="text-xs text-[#64748B]">Por conta de quem? (opcional)</span><input value={editPaidFor} onChange={(event) => setEditPaidFor(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-3 text-sm" /></label>
+                <p className="text-xs text-[#64748B]">A classificação não altera valor, data, conta ou origem importada. Vamos tratar transferências na próxima etapa.</p>
+                <div className="flex justify-end gap-3"><button type="button" onClick={() => setEditId(null)} className="rounded-xl border border-[#DCE5EF] bg-white px-5 py-3 text-sm">Cancelar</button><button type="button" onClick={saveEdit} className="rounded-xl bg-[#34383F] px-5 py-3 text-sm text-white">Salvar classificação</button></div>
+              </div>
+            </div>}
             {transactionTab === "all" && <>
             {/* LISTA */}
             <div className="rounded-3xl border border-white/90 bg-white/65 p-5 shadow-[0_8px_32px_rgba(80,110,150,0.07)] backdrop-blur-2xl md:p-6">
@@ -1249,7 +1289,8 @@ if (amountCents <= 0) {
                   {transactions.map((transaction) => (
                     <div
                       key={transaction.id}
-                      className="flex flex-wrap items-center justify-between gap-3 border-b border-[#EDF0F4] py-4 last:border-0"
+                      onClick={() => startEdit(transaction)}
+                      className="flex cursor-pointer flex-wrap items-center justify-between gap-3 border-b border-[#EDF0F4] py-4 hover:bg-white/60 last:border-0"
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
@@ -1287,7 +1328,7 @@ if (amountCents <= 0) {
                           {money(transaction.amountCents)}
                         </p>
                         <button
-                          onClick={() => deleteTransaction(transaction.id)}
+                          onClick={(event) => { event.stopPropagation(); deleteTransaction(transaction.id); }}
                           className="rounded-lg px-2 py-2 text-xs text-[#A0AABA] hover:bg-rose-50 hover:text-rose-600"
                           title="Excluir lançamento"
                         >
