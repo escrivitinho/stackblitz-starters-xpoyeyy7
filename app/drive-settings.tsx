@@ -221,7 +221,7 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
           for (const file of data.files || []) {
             if (file.mimeType === "application/vnd.google-apps.folder") {
               // Somente subpastas de ano, evitando ler documentos de outras organizações.
-              if (format === "OFX" && depth === 0 && /^20\\d{2}$/.test(file.name)) {
+              if (format === "OFX" && depth === 0 && /^20\d{2}$/.test(file.name)) {
                 await collectFiles(file.id, folderPath + " / " + file.name, format, depth + 1);
               }
               continue;
