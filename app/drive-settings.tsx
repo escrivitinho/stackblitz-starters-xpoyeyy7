@@ -56,8 +56,14 @@ function parseOfx(raw: string): OfxEntry[] {
   };
   for (const block of blocks) {
     const rawDate = field(block, "DTPOSTED");
-    const rawAmount = field(block, "TRNAMT").replace(",", ".");
-    const amount = Number(rawAmount);
+    const rawAmount = field(block, "TRNAMT").replace(/\s/g, "");
+    // Alguns OFX da Caixa usam ponto tanto para milhar quanto para decimal: 1.683.00.
+    // Aceitar apenas formatos numéricos conhecidos, sem arredondar valores ambíguos.
+    let normalizedAmount = rawAmount;
+    if (/^[+-]?\d{1,3}(?:\.\d{3})+\.\d{2}$/.test(rawAmount)) normalizedAmount = rawAmount.replace(/\./g, "").replace(/(\d{2})$/, ".$1");
+    else if (/^[+-]?\d{1,3}(?:\.\d{3})+,\d{2}$/.test(rawAmount)) normalizedAmount = rawAmount.replace(/\./g, "").replace(",", ".");
+    else if (/^[+-]?\d+,\d{1,2}$/.test(rawAmount)) normalizedAmount = rawAmount.replace(",", ".");
+    const amount = /^[+-]?\d+(?:\.\d{1,2})?$/.test(normalizedAmount) ? Number(normalizedAmount) : NaN;
     const date = rawDate.slice(0, 8);
     if (!/^\d{8}$/.test(date) || !Number.isFinite(amount) || !rawAmount) continue;
     const description = field(block, "MEMO") || field(block, "NAME") || field(block, "TRNTYPE") || "Sem descrição";
