@@ -22,6 +22,33 @@ const typeLabels: Record<CategoryType, string> = {
   transfer: "Transferência",
 };
 
+const typeAccents: Record<CategoryType, { border: string; icon: string; number: string; tab: string }> = {
+  income: {
+    border: "border-emerald-200/70",
+    icon: "bg-emerald-100/70 text-emerald-700",
+    number: "text-emerald-700",
+    tab: "bg-emerald-50/90 text-emerald-800 ring-1 ring-emerald-200/80 shadow-sm",
+  },
+  expense: {
+    border: "border-rose-200/70",
+    icon: "bg-rose-100/70 text-rose-700",
+    number: "text-rose-700",
+    tab: "bg-rose-50/90 text-rose-800 ring-1 ring-rose-200/80 shadow-sm",
+  },
+  transfer: {
+    border: "border-slate-200/90",
+    icon: "bg-slate-200/70 text-slate-600",
+    number: "text-slate-700",
+    tab: "bg-slate-100/90 text-slate-800 ring-1 ring-slate-200 shadow-sm",
+  },
+};
+
+const typeIcons: Record<CategoryType, string> = {
+  income: "↙",
+  expense: "↗",
+  transfer: "⇄",
+};
+
 const typeStyles: Record<CategoryType, string> = {
   income: "bg-emerald-50 text-emerald-700",
   expense: "bg-rose-50 text-rose-700",
@@ -181,9 +208,12 @@ export default function CategoriesManager({ categories, onChange }: Props) {
     <div className="moneo-categories space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {(["income", "expense", "transfer"] as CategoryType[]).map((item) => (
-          <div key={item} className="rounded-3xl border border-white/90 bg-white/65 p-5 shadow-sm backdrop-blur-2xl">
-            <p className="text-sm text-[#77879B]">Categorias de {typeLabels[item].toLowerCase()}s</p>
-            <p className="mt-3 text-2xl font-semibold text-[#263D59]">{categories.filter((category) => category.type === item).length}</p>
+          <div key={item} className={`rounded-3xl border bg-white/65 p-5 shadow-sm backdrop-blur-2xl ${typeAccents[item].border}`}>
+            <div className="flex items-center gap-3">
+              <span aria-hidden="true" className={`flex h-10 w-10 items-center justify-center rounded-2xl text-xl font-semibold ${typeAccents[item].icon}`}>{typeIcons[item]}</span>
+              <p className="text-sm font-medium text-[#596577]">Categorias de {item === "income" ? "receitas" : item === "expense" ? "despesas" : "transferências"}</p>
+            </div>
+            <p className={`mt-3 text-2xl font-semibold ${typeAccents[item].number}`}>{categories.filter((category) => category.type === item).length}</p>
           </div>
         ))}
       </div>
@@ -196,8 +226,9 @@ export default function CategoriesManager({ categories, onChange }: Props) {
             role="tab"
             aria-selected={type === item}
             onClick={() => selectTab(item)}
-            className={`rounded-xl px-5 py-3 text-sm font-medium transition ${type === item ? "bg-white/90 text-[#25282D] shadow-sm ring-1 ring-white" : "text-[#737780] hover:bg-white/60"}`}
+            className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-medium transition ${type === item ? typeAccents[item].tab : "text-[#737780] hover:bg-white/60"}`}
           >
+            <span aria-hidden="true" className={`text-lg leading-none ${type === item ? typeAccents[item].number : "text-[#8A96A7]"}`}>{typeIcons[item]}</span>
             {item === "income" ? "Receitas" : item === "expense" ? "Despesas" : "Transferências"}
             <span className={`ml-2 text-xs ${type === item ? "text-[#707780]" : "text-[#94A0AF]"}`}>
               {categories.filter((category) => category.type === item).length}
