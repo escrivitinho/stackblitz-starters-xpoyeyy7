@@ -43,6 +43,27 @@ async function findFolder(token: string, parent: string, name: string): Promise<
   return matches;
 }
 
+
+type OfxEntry = { date: string; description: string; amount: number; fitid: string };
+function parseOfx(raw: string): OfxEntry[] {
+  const entries: OfxEntry[] = [];
+  const blocks = raw.match(/<STMTTRN>([\\s\\S]*?)(?:<\\/STMTTRN>|(?=<STMTTRN>)|$)/gi) || [];
+  const field = (block: string, tag: string) => {
+    const match = block.match(new RegExp("<" + tag + ">\\\\s*([^<\\\\r\\\\n]+)", "i"));
+    return match?.[1]?.trim() || "";
+  };
+  for (const block of blocks) {
+    const rawDate = field(block, "DTPOSTED");
+    const rawAmount = field(block, "TRNAMT").replace(",", ".");
+    const amount = Number(rawAmount);
+    const date = rawDate.slice(0, 8);
+    if (!/^\\d{8}$/.test(date) || !Number.isFinite(amount) || !rawAmount) continue;
+    const description = field(block, "MEMO") || field(block, "NAME") || field(block, "TRNTYPE") || "Sem descrição";
+    entries.push({ date: date.slice(6, 8) + "/" + date.slice(4, 6) + "/" + date.slice(0, 4), description, amount, fitid: field(block, "FITID") });
+  }
+  return entries;
+}
+
 export default function DriveSettings() {
   const [sdkReady, setSdkReady] = useState(false);
   const [connected, setConnected] = useState(false);
@@ -53,6 +74,8 @@ export default function DriveSettings() {
   const [results, setResults] = useState<FolderResult[] | null>(null);
   const [files, setFiles] = useState<FileResult[] | null>(null);
   const [loadingFiles, setLoadingFiles] = useState(false);
+  const [preview, setPreview] = useState<{ fileId: string; fileName: string; entries: OfxEntry[]; skipped: number } | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   useEffect(() => {
     if (window.google?.accounts.oauth2) { setSdkReady(true); return; }
@@ -68,6 +91,7 @@ export default function DriveSettings() {
   function connect() {
     setError("");
     setFiles(null);
+    setPreview(null);
     if (!window.google?.accounts.oauth2) { setError("Autenticação Google indisponível."); return; }
     setBusy(true);
     try {
@@ -182,6 +206,36 @@ export default function DriveSettings() {
     }
   }
 
+
+  async function previewOfx(file: FileResult) {
+    const token = tokenRef.current;
+    if (!token) return;
+    setLoadingPreview(true);
+    setPreview(null);
+    setError("");
+    try {
+      const response = await fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(file.id) + "?alt=media", {
+        headers: { Authorization: "Bearer " + token },
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error(response.status === 401 ? "Sua autorização expirou. Reconecte o Google Drive." : "Erro ao ler OFX (" + response.status + ").");
+      const buffer = await response.arrayBuffer();
+      if (buffer.byteLength > 5 * 1024 * 1024) throw new Error("Arquivo acima de 5 MB. Prévia não disponível.");
+      const bytes = new Uint8Array(buffer);
+      const utf8 = new TextDecoder("utf-8").decode(bytes);
+      const raw = utf8.includes("\uFFFD") ? new TextDecoder("windows-1252").decode(bytes) : utf8;
+      if (!/<OFX>/i.test(raw)) throw new Error("O arquivo não parece ser um OFX válido.");
+      const entries = parseOfx(raw);
+      if (!entries.length) throw new Error("Não foram encontradas transações STMTTRN válidas neste OFX.");
+      const blocks = raw.match(/<STMTTRN>/gi) || [];
+      setPreview({ fileId: file.id, fileName: file.name, entries, skipped: blocks.length - entries.length });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao gerar prévia OFX.");
+    } finally {
+      setLoadingPreview(false);
+    }
+  }
+
   return (
     <section className="mt-5 rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm backdrop-blur-2xl">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -201,7 +255,8 @@ export default function DriveSettings() {
       </div>
       {connected && <div className="mt-4"><button type="button" disabled={checking} onClick={() => void checkFolders()} className="rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white disabled:opacity-50">{checking ? "Procurando pastas..." : "Localizar pastas no Drive"}</button><p className="mt-2 text-xs text-[#77879B]">Consulta apenas nomes e identificadores de pastas. Não lê nem importa arquivos financeiros.</p></div>}
       {results?.some((item) => item.status === "found") && <div className="mt-4"><button type="button" disabled={checking || loadingFiles} onClick={() => void checkFiles()} className="rounded-xl border border-[#DCE5EF] bg-white/80 px-5 py-3 text-sm font-medium text-[#34383F] disabled:opacity-50">{loadingFiles ? "Verificando arquivos..." : "Verificar arquivos"}</button><p className="mt-2 text-xs text-[#77879B]">Exibe somente metadados de OFX e CSV nas pastas encontradas, sem baixar o conteúdo.</p></div>}
-      {files && <div className="mt-5 rounded-2xl border border-[#E5EAF0] bg-white/70 p-4"><h3 className="text-sm font-semibold text-[#26364D]">Arquivos encontrados ({files.length})</h3>{files.length === 0 ? <p className="mt-3 text-sm text-[#77879B]">Nenhum arquivo OFX ou CSV encontrado nas pastas correspondentes.</p> : <div className="mt-3 max-h-96 space-y-2 overflow-y-auto">{files.map((file) => <div key={file.id} className="border-t border-[#E5EAF0] pt-2"><p className="break-all text-sm font-medium text-[#26364D]">{file.name}</p><p className="text-xs text-[#77879B]">{folders.find((folder) => folder.path === file.folderPath)?.label} · {file.modifiedTime ? new Date(file.modifiedTime).toLocaleDateString("pt-BR") : "Data indisponível"} · {file.size ? (Number(file.size) / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " KB" : "Tamanho indisponível"}</p></div>)}</div>}</div>}
+      {files && <div className="mt-5 rounded-2xl border border-[#E5EAF0] bg-white/70 p-4"><h3 className="text-sm font-semibold text-[#26364D]">Arquivos encontrados ({files.length})</h3>{files.length === 0 ? <p className="mt-3 text-sm text-[#77879B]">Nenhum arquivo OFX ou CSV encontrado nas pastas correspondentes.</p> : <div className="mt-3 max-h-96 space-y-2 overflow-y-auto">{files.map((file) => <div key={file.id} className="border-t border-[#E5EAF0] pt-2"><div className="flex flex-wrap items-center justify-between gap-2"><p className="break-all text-sm font-medium text-[#26364D]">{file.name}</p>{file.name.toLowerCase().endsWith(".ofx") && <button type="button" disabled={loadingPreview} onClick={() => void previewOfx(file)} className="rounded-lg border border-[#DCE5EF] px-3 py-1 text-xs font-medium text-[#34383F] disabled:opacity-50">{loadingPreview ? "Lendo..." : "Prévia OFX"}</button>}</div><p className="text-xs text-[#77879B]">{folders.find((folder) => folder.path === file.folderPath)?.label} · {file.modifiedTime ? new Date(file.modifiedTime).toLocaleDateString("pt-BR") : "Data indisponível"} · {file.size ? (Number(file.size) / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " KB" : "Tamanho indisponível"}</p></div>)}</div>}</div>}
+      {preview && <div className="mt-4 rounded-2xl border border-[#DCE5EF] bg-white/90 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold text-[#26364D]">Prévia: {preview.fileName}</h3><button type="button" onClick={() => setPreview(null)} className="text-xs text-[#526F96]">Fechar prévia</button></div><p className="mt-2 text-xs text-[#77879B]">{preview.entries.length} movimentações reconhecidas{preview.skipped > 0 ? " · " + preview.skipped + " ignoradas por dados inválidos" : ""}. Apenas leitura: nenhuma movimentação foi importada.</p><div className="mt-3 max-h-80 overflow-auto"><table className="w-full min-w-[420px] text-left text-xs"><thead><tr className="border-b border-[#E5EAF0] text-[#64748B]"><th className="py-2">Data</th><th>Descrição</th><th className="text-right">Valor</th></tr></thead><tbody>{preview.entries.slice(0, 100).map((entry, index) => <tr key={index} className="border-b border-[#EEF2F6]"><td className="py-2 whitespace-nowrap">{entry.date}</td><td className="py-2">{entry.description}</td><td className="py-2 text-right whitespace-nowrap">{entry.amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td></tr>)}</tbody></table></div>{preview.entries.length > 100 && <p className="mt-2 text-xs text-[#77879B]">Exibindo as primeiras 100 movimentações.</p>}</div>}
       {error && <p role="alert" className="mt-3 text-sm text-rose-600">{error}</p>}
       {connected && <p role="status" className="mt-3 text-sm text-emerald-700">Autorização recebida nesta sessão. A sincronização ainda não está ativa.</p>}
       <div className="mt-5 rounded-2xl border border-[#E5EAF0] bg-white/70 p-4">
