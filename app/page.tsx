@@ -236,7 +236,12 @@ export default function Home() {
   const [paymentMethod, setPaymentMethod] = useState<"debit" | "credit">("debit");
   const [selectedCreditCard, setSelectedCreditCard] = useState<CardEntry["card"]>("Nubank Crédito");
   const [installmentCount, setInstallmentCount] = useState(1);
-  const [invoiceOffset, setInvoiceOffset] = useState<1 | 2>(1);
+  const [invoiceCompetenceOverride, setInvoiceCompetenceOverride] = useState("");
+  const [isInstallment, setIsInstallment] = useState(false);
+  const [purchaseYear, purchaseMonth] = transactionDate.split("-").map(Number);
+  const suggestedInvoice = Number.isInteger(purchaseYear) && purchaseMonth >= 1 && purchaseMonth <= 12 ? new Date(Date.UTC(purchaseYear, purchaseMonth, 1)) : null;
+  const suggestedCompetence = suggestedInvoice ? String(suggestedInvoice.getUTCMonth() + 1).padStart(2, "0") + String(suggestedInvoice.getUTCFullYear()) : "";
+  const invoiceCompetence = invoiceCompetenceOverride || suggestedCompetence;
 
 
 const totalBalanceCents = calculateTotalBalance(
@@ -534,7 +539,8 @@ const newAccount: Account = {
     setPaidFor("");
     setPaymentMethod("debit");
     setInstallmentCount(1);
-    setInvoiceOffset(1);
+    setInvoiceCompetenceOverride("");
+    setIsInstallment(false);
     setTransactionError("");
   }
 
@@ -581,18 +587,23 @@ if (amountCents <= 0) {
 }
 
     if (transactionType === "expense" && paymentMethod === "credit") {
-      if (!Number.isInteger(installmentCount) || installmentCount < 1 || installmentCount > 48) {
+      const installments = isInstallment ? installmentCount : 1;
+      if (!/^\\d{6}$/.test(invoiceCompetence) || Number(invoiceCompetence.slice(0, 2)) < 1 || Number(invoiceCompetence.slice(0, 2)) > 12 || Number(invoiceCompetence.slice(2)) < 2000) {
+        setTransactionError("Informe uma competência válida no formato MMAAAA."); return;
+      }
+      if (!Number.isInteger(installments) || installments < 1 || installments > 48) {
         setTransactionError("Escolha entre 1 e 48 parcelas."); return;
       }
-      const [year, month] = transactionDate.split("-").map(Number);
+      const year = Number(invoiceCompetence.slice(2));
+      const month = Number(invoiceCompetence.slice(0, 2));
       const groupId = crypto.randomUUID();
-      const base = Math.floor(amountCents / installmentCount);
-      const remainder = amountCents % installmentCount;
+      const base = Math.floor(amountCents / installments);
+      const remainder = amountCents % installments;
       const category = categories.find((item) => item.type === "expense" && item.name === transactionGroup);
-      const created: CardEntry[] = Array.from({ length: installmentCount }, (_, index) => ({
+      const created: CardEntry[] = Array.from({ length: installments }, (_, index) => ({
         id: crypto.randomUUID(), card: selectedCreditCard,
-        date: new Date(Date.UTC(year, month + invoiceOffset - 1 + index, selectedCreditCard === "Inter Crédito" ? 7 : 8)).toISOString().slice(0, 10),
-        description: transactionDescription.trim() + (installmentCount > 1 ? " - Parcela " + (index + 1) + "/" + installmentCount : ""),
+        date: new Date(Date.UTC(year, month - 1 + index, selectedCreditCard === "Inter Crédito" ? 7 : 8)).toISOString().slice(0, 10),
+        description: transactionDescription.trim() + (installments > 1 ? " - Parcela " + (index + 1) + "/" + installments : ""),
         amountCents: base + (index < remainder ? 1 : 0),
         importKey: "manual-card:" + groupId + ":" + (index + 1),
         categoryId: category?.id,
@@ -1002,27 +1013,29 @@ if (amountCents <= 0) {
                     </div>
                   </div>
                   {transactionType === "expense" && paymentMethod === "credit" && (
-                    <div className="mb-5 space-y-2">
-                      <label htmlFor="installment-count" className="block text-xs font-medium text-[#64748B]">Parcelas (1 a 48)</label>
-                      <input id="installment-count" type="number" min={1} max={48} value={installmentCount} onChange={(e) => setInstallmentCount(Number(e.target.value))} className="w-full max-w-48 rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm" />
-                      <span className="block text-xs font-medium text-[#64748B]">Primeira fatura</span>
-                      <div className="flex flex-wrap justify-center gap-3">
-                        {([1, 2] as const).map((offset) => {
-                          const [year, month] = transactionDate.split("-").map(Number);
-                          const valid = Number.isInteger(year) && Number.isInteger(month) && month >= 1 && month <= 12;
-                          const invoiceDate = valid ? new Date(Date.UTC(year, month + offset - 1, 1)) : null;
-                          const label = invoiceDate ? invoiceDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" }) : offset === 1 ? "Próxima fatura" : "Fatura posterior";
-                          return <button key={offset} type="button" aria-pressed={invoiceOffset === offset} onClick={() => setInvoiceOffset(offset)}
-                            className={`min-h-12 w-44 rounded-2xl border px-4 py-3 text-center text-sm font-semibold backdrop-blur-xl transition ${invoiceOffset === offset ? "border-sky-400/80 bg-sky-200/75 text-sky-950 shadow-md" : "border-white/80 bg-white/60 text-[#64748B] hover:bg-white/85"}`}>{label}{invoiceOffset === offset ? " ✓" : ""}</button>;
-                        })}
-                      </div>
-                      <p className="text-xs text-[#77879B]">Sugestão: fatura do mês seguinte à compra. Se o banco adiar a cobrança, escolha a fatura posterior. As parcelas seguintes acompanham a escolha. Vencimento: dia {selectedCreditCard === "Inter Crédito" ? "07" : "08"}. Confira sempre com a fatura oficial.</p>
+                    <div className="mb-5 grid gap-4 md:grid-cols-2">
+                      <label className="space-y-2">
+                    <span className="text-xs font-medium text-[#64748B]">{transactionType === "expense" && paymentMethod === "credit" ? "Data da compra" : "Data"}</span>
+                    <input
+                      type="date"
+                      value={transactionDate}
+                      onChange={(e) => { setTransactionDate(e.target.value); setInvoiceCompetenceOverride(""); }}
+                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF]"
+                    />
+                  </label>
+                      <label className="space-y-2">
+                        <span className="text-xs font-medium text-[#64748B]">Competência da fatura (MM/AAAA)</span>
+                        <input value={invoiceCompetence.length > 2 ? invoiceCompetence.slice(0, 2) + "/" + invoiceCompetence.slice(2) : invoiceCompetence}
+                          onChange={(e) => setInvoiceCompetenceOverride(e.target.value.replace(/\\D/g, "").slice(0, 6))}
+                          inputMode="numeric" maxLength={7} placeholder="MMAAAA"
+                          className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF]" />
+                      </label>
                     </div>
                   )}
-
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
 
-                  <label className="space-y-2">
+                  <div className={`grid gap-4 ${transactionType === "expense" && paymentMethod === "credit" ? "md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]" : "md:grid-cols-2"} md:col-span-2`}>
+                    <label className="space-y-2">
                     <span className="text-xs font-medium text-[#64748B]">Descrição</span>
                     <input
                       value={transactionDescription}
@@ -1031,8 +1044,7 @@ if (amountCents <= 0) {
                       className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF]"
                     />
                   </label>
-
-                  <label className="space-y-2">
+                    <label className="space-y-2">
                     <span className="text-xs font-medium text-[#64748B]">Valor (R$)</span>
                     <input
                       value={transactionAmount}
@@ -1042,17 +1054,24 @@ if (amountCents <= 0) {
                       className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF]"
                     />
                   </label>
-
-                  <label className="space-y-2">
-                    <span className="text-xs font-medium text-[#64748B]">Data</span>
+                    {transactionType === "expense" && paymentMethod === "credit" && <div className="space-y-2">
+                      <span className="block text-xs font-medium text-[#64748B]">Parcelado?</span>
+                      <div className="flex gap-2">
+                        {([false, true] as const).map((choice) => <button type="button" key={String(choice)} onClick={() => { setIsInstallment(choice); setInstallmentCount(choice ? 2 : 1); }} aria-pressed={isInstallment === choice}
+                          className={`flex-1 rounded-xl border px-3 py-3 text-sm backdrop-blur-xl ${isInstallment === choice ? "border-sky-300 bg-sky-100/80 text-sky-900" : "border-white/80 bg-white/60 text-[#64748B]"}`}>{choice ? "Sim" : "Não"}</button>)}
+                      </div>
+                      {isInstallment && <label className="block space-y-1"><span className="text-xs text-[#64748B]">Quantidade de parcelas</span><input type="number" min={2} max={48} value={installmentCount < 2 ? 2 : installmentCount} onChange={(e) => setInstallmentCount(Number(e.target.value))} className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-3 py-2 text-sm" /></label>}
+                    </div>}
+                  </div>
+                  {!(transactionType === "expense" && paymentMethod === "credit") && <label className="space-y-2">
+                    <span className="text-xs font-medium text-[#64748B]">{transactionType === "expense" && paymentMethod === "credit" ? "Data da compra" : "Data"}</span>
                     <input
                       type="date"
                       value={transactionDate}
-                      onChange={(e) => setTransactionDate(e.target.value)}
+                      onChange={(e) => { setTransactionDate(e.target.value); setInvoiceCompetenceOverride(""); }}
                       className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF]"
                     />
                   </label>
-
                   {transactionType === "transfer" ? (
                     <label className="space-y-2 md:col-span-2">
                       <span className="text-xs font-medium text-[#64748B]">Conta de destino</span>
