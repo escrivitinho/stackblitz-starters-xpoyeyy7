@@ -100,6 +100,8 @@ function parseNubankCsv(text: string): Draft[] {
 }
 
 export default function CardsManager({ entries, onChange, categories }: { entries: CardEntry[]; onChange: (entries: CardEntry[]) => void; categories: Category[] }) {
+  const [openedCard, setOpenedCard] = useState<CardEntry["card"] | null>(null);
+  const [openedInvoice, setOpenedInvoice] = useState<string | null>(null);
   const [manualCard, setManualCard] = useState<CardEntry["card"]>("Nubank Crédito");
   const [manualDate, setManualDate] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [manualDescription, setManualDescription] = useState("");
@@ -166,16 +168,74 @@ export default function CardsManager({ entries, onChange, categories }: { entrie
   }
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-2">
+      {openedCard ? (
+        <section className="rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm backdrop-blur-2xl">
+          <button type="button" onClick={() => { if (openedInvoice) setOpenedInvoice(null); else setOpenedCard(null); }} className="mb-5 rounded-xl border border-white/90 bg-white/70 px-4 py-2 text-sm font-medium text-[#526B8B] backdrop-blur-xl hover:bg-white">← {openedInvoice ? "Voltar às faturas" : "Voltar aos cartões"}</button>
+          <h3 className="text-xl font-semibold text-[#26364D]">{openedCard}</h3>
+          {!openedInvoice ? (
+            <>
+              <p className="mt-2 text-sm text-[#77879B]">Selecione uma fatura para consultar as compras e os demais lançamentos.</p>
+              <div className="mt-5 space-y-3">
+                {Array.from(new Set(entries.filter((entry) => entry.card === openedCard).map((entry) => entry.date.slice(0, 7)))).sort().reverse().map((month) => {
+                  const invoiceEntries = entries.filter((entry) => entry.card === openedCard && entry.date.startsWith(month));
+                  const purchases = invoiceEntries.filter((entry) => (entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase")) === "purchase");
+                  const credits = invoiceEntries.filter((entry) => (entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase")) === "credit");
+                  const purchaseTotal = purchases.reduce((sum, entry) => sum + Math.abs(entry.amountCents), 0);
+                  const creditTotal = credits.reduce((sum, entry) => sum + Math.abs(entry.amountCents), 0);
+                  const label = new Date(month + "-01T12:00:00Z").toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
+                  return <button type="button" key={month} onClick={() => setOpenedInvoice(month)} className="flex w-full items-center justify-between gap-4 rounded-2xl border border-white/90 bg-white/65 px-5 py-4 text-left shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/85">
+                    <span><span className="block font-semibold capitalize text-[#26364D]">{label}</span><span className="mt-1 block text-xs text-[#77879B]">{purchases.length} compras · {credits.length} créditos/estornos</span></span>
+                    <span className="text-right"><span className="block font-semibold text-[#B65D58]">{formatCents(purchaseTotal - creditTotal)}</span><span className="text-xs text-[#77879B]">Compras − créditos ›</span></span>
+                  </button>;
+                })}
+                {!entries.some((entry) => entry.card === openedCard) && <p className="rounded-2xl bg-white/65 p-5 text-sm text-[#77879B]">Nenhuma fatura com lançamentos cadastrados.</p>}
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mt-2 text-sm capitalize text-[#77879B]">Fatura de {new Date(openedInvoice + "-01T12:00:00Z").toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" })}</p>
+              {(() => {
+                const invoiceEntries = entries.filter((entry) => entry.card === openedCard && entry.date.startsWith(openedInvoice)).sort((a, b) => b.date.localeCompare(a.date));
+                const purchases = invoiceEntries.filter((entry) => (entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase")) === "purchase");
+                const credits = invoiceEntries.filter((entry) => (entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase")) === "credit");
+                const payments = invoiceEntries.filter((entry) => entry.kind === "payment");
+                const total = purchases.reduce((sum, entry) => sum + Math.abs(entry.amountCents), 0) - credits.reduce((sum, entry) => sum + Math.abs(entry.amountCents), 0);
+                return <>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-rose-100 bg-rose-50/65 p-4 backdrop-blur-xl"><p className="text-xs text-[#77879B]">Compras</p><p className="mt-2 font-semibold text-[#B65D58]">{formatCents(purchases.reduce((sum, entry) => sum + Math.abs(entry.amountCents), 0))}</p></div>
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/65 p-4 backdrop-blur-xl"><p className="text-xs text-[#77879B]">Créditos / estornos</p><p className="mt-2 font-semibold text-emerald-700">{formatCents(credits.reduce((sum, entry) => sum + Math.abs(entry.amountCents), 0))}</p></div>
+                    <div className="rounded-2xl border border-sky-100 bg-sky-50/65 p-4 backdrop-blur-xl"><p className="text-xs text-[#77879B]">Total após créditos</p><p className="mt-2 font-semibold text-[#263D59]">{formatCents(total)}</p></div>
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    {invoiceEntries.map((entry) => {
+                      const kind = entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase");
+                      const category = categories.find((item) => item.id === entry.categoryId);
+                      const subcategory = category?.subcategories.find((item) => item.id === entry.subcategoryId);
+                      return <div key={entry.id} className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-white/90 bg-white/70 p-4 backdrop-blur-xl">
+                        <div><p className="font-medium text-[#26364D]">{entry.description}</p><p className="mt-1 text-xs text-[#77879B]">{entry.date.split("-").reverse().join("/")} · {kind === "purchase" ? "Compra" : kind === "payment" ? "Pagamento da fatura" : "Crédito / estorno"}{category ? " · " + category.name : ""}{subcategory ? " → " + subcategory.name : ""}</p></div>
+                        <p className={`font-semibold ${kind === "purchase" ? "text-[#B65D58]" : "text-emerald-700"}`}>{kind === "purchase" ? "" : "−"}{formatCents(Math.abs(entry.amountCents))}</p>
+                      </div>;
+                    })}
+                    {!invoiceEntries.length && <p className="text-sm text-[#77879B]">Nenhum lançamento nesta fatura.</p>}
+                  </div>
+                  {payments.length > 0 && <p className="mt-4 text-xs text-[#77879B]">Pagamentos identificados são exibidos para consulta, mas não reduzem o total de compras desta fatura.</p>}
+                </>;
+              })()}
+            </>
+          )}
+          <p className="mt-5 text-xs text-[#77879B]">Agrupamento provisório pelo mês da data registrada. O ciclo de fechamento e vencimento será configurado depois; valores não representam necessariamente a fatura oficial do banco.</p>
+        </section>
+      ) : <div className="grid gap-4 sm:grid-cols-2">
         {(["Nubank Crédito", "Inter Crédito"] as const).map((card) => {
           const cardEntries = entries.filter((entry) => entry.card === card);
-          return <div key={card} className="rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm backdrop-blur-2xl">
-            <p className="text-sm text-[#77879B]">{card}</p>
+          const violet = card === "Nubank Crédito";
+          return <button type="button" key={card} onClick={() => { setOpenedCard(card); setOpenedInvoice(null); }} className={`rounded-3xl border p-6 text-left shadow-sm backdrop-blur-2xl transition hover:-translate-y-0.5 hover:shadow-lg ${violet ? "border-violet-200/80 bg-gradient-to-br from-violet-100/80 to-violet-200/50" : "border-orange-200/80 bg-gradient-to-br from-orange-100/80 to-orange-200/50"}`}>
+            <p className={`text-sm font-semibold ${violet ? "text-violet-800" : "text-orange-800"}`}>{card} →</p>
             <p className="mt-3 text-2xl font-semibold text-[#263D59]">{cardEntries.length} movimentações</p>
-            <p className="mt-2 text-xs text-[#8B9AAD]">Compras e créditos importados · sem alterar saldo bancário</p>
-          </div>;
+            <p className="mt-2 text-xs text-[#77879B]">Clique para consultar as faturas</p>
+          </button>;
         })}
-      </div>
+      </div>}
       <section className="rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm backdrop-blur-2xl">
         <h3 className="text-lg font-semibold text-[#26364D]">Registrar compra no cartão</h3>
         <p className="mt-2 text-sm text-[#707780]">À vista ou parcelada. Cada parcela aparece no mês de sua fatura, sem alterar o saldo bancário. A conciliação com CSV será implementada depois.</p>
