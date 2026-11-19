@@ -161,7 +161,7 @@ export default function Home() {
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [cardEntries, setCardEntries] = useState<CardEntry[]>([]);
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
-  const [transactionTab, setTransactionTab] = useState<"all" | "pending">("all");
+  const [transactionTab, setTransactionTab] = useState<"all" | "pending" | "transfers">("all");
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "income" | "expense">("all");
   const [transactionMonthFilter, setTransactionMonthFilter] = useState("");
   const [showTransferSuggestions, setShowTransferSuggestions] = useState(false);
@@ -1222,8 +1222,17 @@ if (amountCents <= 0) {
             )}
 
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => setTransactionTab("all")} className={`rounded-xl px-4 py-2 text-sm font-semibold ${transactionTab === "all" ? "bg-[#34383F] text-white" : "border border-[#DCE5EF] bg-white text-[#526B8B]"}`}>Todos os lançamentos ({transactions.length})</button>
-              <button type="button" onClick={() => setTransactionTab("pending")} className={`rounded-xl px-4 py-2 text-sm font-semibold ${transactionTab === "pending" ? "bg-[#34383F] text-white" : "border border-[#DCE5EF] bg-white text-[#526B8B]"}`}>Pendentes verificação ({pendingTransactions.length})</button>
+              {([
+                ["all", `Todos os lançamentos (${transactions.length})`],
+                ["pending", `Pendentes verificação (${pendingTransactions.length})`],
+                ["transfers", `Possíveis transferências (${transferSuggestions.length})`],
+              ] as const).map(([tab, label]) => (
+                <button key={tab} type="button" onClick={() => setTransactionTab(tab)}
+                  aria-pressed={transactionTab === tab}
+                  className={`w-full rounded-xl px-4 py-2 text-sm font-semibold sm:w-[220px] ${transactionTab === tab ? "bg-[#34383F] text-white" : "border border-[#DCE5EF] bg-white text-[#526B8B]"}`}>
+                  {label}
+                </button>
+              ))}
             </div>
             {transactionTab === "pending" && <div className="rounded-3xl border border-white/90 bg-white/65 p-5 shadow-sm md:p-6">
               <h3 className="font-semibold text-[#26364D]">Pendentes verificação</h3>
@@ -1285,7 +1294,7 @@ if (amountCents <= 0) {
                 <div className="flex justify-end gap-3"><button type="button" onClick={() => setEditId(null)} className="rounded-xl border border-[#DCE5EF] bg-white px-5 py-3 text-sm">Cancelar</button><button type="button" onClick={saveEdit} className="rounded-xl bg-[#34383F] px-5 py-3 text-sm text-white">Salvar classificação</button></div>
               </div>
             </div>}
-            {transactionTab === "all" && <div className="rounded-3xl border border-white/90 bg-white/65 p-4 shadow-sm backdrop-blur-2xl md:p-5">
+            {transactionTab === "transfers" && <div className="rounded-3xl border border-white/90 bg-white/65 p-4 shadow-sm backdrop-blur-2xl md:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div><h3 className="text-sm font-semibold text-[#26364D]">Possíveis transferências entre contas</h3>
                   <p className="mt-1 text-xs text-[#64748B]">Identificamos {transferSuggestions.length} par(es) com valores iguais, contas diferentes e datas próximas. Nenhum lançamento foi alterado.</p></div>
