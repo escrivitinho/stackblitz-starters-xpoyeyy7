@@ -982,6 +982,31 @@ if (amountCents <= 0) {
                     </div>
                   )}
 
+                  <div className="mb-5 space-y-2">
+                    <span className="text-xs font-medium text-[#64748B]">{transactionType === "expense" && paymentMethod === "credit" ? "Cartão" : "Conta"}</span>
+                    <div className="flex flex-wrap gap-3">
+                      {(transactionType === "expense" && paymentMethod === "credit" ? (["Nubank Crédito", "Inter Crédito"] as CardEntry["card"][]) : accounts.map((account) => account.name)).map((name, index) => {
+                        const account = transactionType === "expense" && paymentMethod === "credit" ? null : accounts[index];
+                        const selected = account ? transactionAccount === String(account.id) : selectedCreditCard === name;
+                        const tone = name.toLowerCase().includes("nubank") ? "violet" : name.toLowerCase().includes("inter") ? "orange" : name.toLowerCase().includes("caixa") ? "sky" : "teal";
+                        const palette = {
+                          violet: selected ? "border-violet-400/80 bg-violet-200/75 text-violet-950 shadow-[0_6px_22px_rgba(139,92,246,0.18)]" : "border-violet-200/80 bg-violet-100/55 text-violet-800",
+                          orange: selected ? "border-orange-400/80 bg-orange-200/75 text-orange-950 shadow-[0_6px_22px_rgba(249,115,22,0.18)]" : "border-orange-200/80 bg-orange-100/55 text-orange-800",
+                          sky: selected ? "border-sky-400/80 bg-sky-200/75 text-sky-950 shadow-[0_6px_22px_rgba(14,165,233,0.18)]" : "border-sky-200/80 bg-sky-100/55 text-sky-800",
+                          teal: selected ? "border-teal-400/80 bg-teal-200/75 text-teal-950 shadow-[0_6px_22px_rgba(20,184,166,0.18)]" : "border-teal-200/80 bg-teal-100/55 text-teal-800",
+                        };
+                        return <button key={account?.id ?? name} type="button" aria-pressed={selected} onClick={() => account ? setTransactionAccount(String(account.id)) : setSelectedCreditCard(name as CardEntry["card"])} className={`rounded-2xl border px-5 py-3 text-sm font-semibold backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-lg ${palette[tone]}`}>{name}{selected ? " ✓" : ""}</button>;
+                      })}
+                    </div>
+                  </div>
+                  {transactionType === "expense" && paymentMethod === "credit" && (
+                    <div className="mb-5 space-y-2">
+                      <label htmlFor="installment-count" className="block text-xs font-medium text-[#64748B]">Parcelas (1 a 48)</label>
+                      <input id="installment-count" type="number" min={1} max={48} value={installmentCount} onChange={(e) => setInstallmentCount(Number(e.target.value))} className="w-full max-w-48 rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm" />
+                      <p className="text-xs text-[#77879B]">Datas provisórias: primeiro vencimento dia 8 do mês seguinte; não use para compras reais até configurarmos o ciclo do cartão.</p>
+                    </div>
+                  )}
+
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
 
                   <label className="space-y-2">
@@ -1014,30 +1039,6 @@ if (amountCents <= 0) {
                       className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF]"
                     />
                   </label>
-
-                  {transactionType === "expense" && paymentMethod === "credit" && (
-                    <>
-                      <label className="space-y-2"><span className="text-xs font-medium text-[#64748B]">Cartão</span><select value={selectedCreditCard} onChange={(e) => setSelectedCreditCard(e.target.value as CardEntry["card"])} className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm"><option>Nubank Crédito</option><option>Inter Crédito</option></select></label>
-                      <label className="space-y-2"><span className="text-xs font-medium text-[#64748B]">Parcelas (1 a 48)</span><input type="number" min={1} max={48} value={installmentCount} onChange={(e) => setInstallmentCount(Number(e.target.value))} className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm" /></label>
-                      <p className="text-xs text-[#77879B] md:col-span-2">Parcelas nas faturas, sem alterar saldo bancário. Datas provisórias: primeiro vencimento dia 8 do mês seguinte; não use para compras reais até configurarmos o ciclo do cartão.</p>
-                    </>
-                  )}
-                  {(transactionType !== "expense" || paymentMethod === "debit") && <label className="space-y-2">
-                    <span className="text-xs font-medium text-[#64748B]">
-                      {transactionType === "transfer" ? "Conta de origem" : "Conta"}
-                    </span>
-                    <select
-                      value={transactionAccount}
-                      onChange={(e) => setTransactionAccount(e.target.value)}
-                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none"
-                    >
-                      {accounts.map((account) => (
-                        <option key={account.id} value={account.id}>
-                          {account.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>}
 
                   {transactionType === "transfer" ? (
                     <label className="space-y-2 md:col-span-2">
