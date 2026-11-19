@@ -972,6 +972,16 @@ if (amountCents <= 0) {
                   ))}
                 </div>
 
+                  {transactionType === "expense" && (
+                    <div className="mb-5 space-y-2">
+                      <span className="text-xs font-medium text-[#64748B]">Forma de pagamento</span>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button type="button" onClick={() => setPaymentMethod("debit")} className={paymentMethod === "debit" ? "rounded-2xl border border-sky-300 bg-sky-100/70 px-4 py-3 text-sm backdrop-blur-xl" : "rounded-2xl border border-white/80 bg-white/60 px-4 py-3 text-sm backdrop-blur-xl"}>Débito / conta</button>
+                        <button type="button" onClick={() => setPaymentMethod("credit")} className={paymentMethod === "credit" ? "rounded-2xl border border-sky-300 bg-sky-100/70 px-4 py-3 text-sm backdrop-blur-xl" : "rounded-2xl border border-white/80 bg-white/60 px-4 py-3 text-sm backdrop-blur-xl"}>Crédito</button>
+                      </div>
+                    </div>
+                  )}
+
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
 
                   <label className="space-y-2">
@@ -1005,15 +1015,6 @@ if (amountCents <= 0) {
                     />
                   </label>
 
-                  {transactionType === "expense" && (
-                    <div className="space-y-2 md:col-span-2">
-                      <span className="text-xs font-medium text-[#64748B]">Forma de pagamento</span>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button type="button" onClick={() => setPaymentMethod("debit")} className={paymentMethod === "debit" ? "rounded-2xl border border-sky-300 bg-sky-100/70 px-4 py-3 text-sm backdrop-blur-xl" : "rounded-2xl border border-white/80 bg-white/60 px-4 py-3 text-sm backdrop-blur-xl"}>Débito / conta</button>
-                        <button type="button" onClick={() => setPaymentMethod("credit")} className={paymentMethod === "credit" ? "rounded-2xl border border-sky-300 bg-sky-100/70 px-4 py-3 text-sm backdrop-blur-xl" : "rounded-2xl border border-white/80 bg-white/60 px-4 py-3 text-sm backdrop-blur-xl"}>Crédito</button>
-                      </div>
-                    </div>
-                  )}
                   {transactionType === "expense" && paymentMethod === "credit" && (
                     <>
                       <label className="space-y-2"><span className="text-xs font-medium text-[#64748B]">Cartão</span><select value={selectedCreditCard} onChange={(e) => setSelectedCreditCard(e.target.value as CardEntry["card"])} className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm"><option>Nubank Crédito</option><option>Inter Crédito</option></select></label>
