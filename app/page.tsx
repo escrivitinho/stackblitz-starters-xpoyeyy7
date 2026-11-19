@@ -233,6 +233,9 @@ export default function Home() {
     useState("Aluguel");
   const [paidFor, setPaidFor] = useState("");
   const [transactionError, setTransactionError] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"debit" | "credit">("debit");
+  const [selectedCreditCard, setSelectedCreditCard] = useState<CardEntry["card"]>("Nubank Crédito");
+  const [installmentCount, setInstallmentCount] = useState(1);
 
 
 const totalBalanceCents = calculateTotalBalance(
@@ -528,6 +531,8 @@ const newAccount: Account = {
     setTransactionGroup(firstExpense?.name || "");
     setTransactionSubcategory(firstExpense?.subcategories[0]?.name || "");
     setPaidFor("");
+    setPaymentMethod("debit");
+    setInstallmentCount(1);
     setTransactionError("");
   }
 
@@ -573,6 +578,29 @@ if (amountCents <= 0) {
   return;
 }
 
+    if (transactionType === "expense" && paymentMethod === "credit") {
+      if (!Number.isInteger(installmentCount) || installmentCount < 1 || installmentCount > 48) {
+        setTransactionError("Escolha entre 1 e 48 parcelas."); return;
+      }
+      const [year, month] = transactionDate.split("-").map(Number);
+      const groupId = crypto.randomUUID();
+      const base = Math.floor(amountCents / installmentCount);
+      const remainder = amountCents % installmentCount;
+      const category = categories.find((item) => item.type === "expense" && item.name === transactionGroup);
+      const created: CardEntry[] = Array.from({ length: installmentCount }, (_, index) => ({
+        id: crypto.randomUUID(), card: selectedCreditCard,
+        date: new Date(Date.UTC(year, month + index, 8)).toISOString().slice(0, 10),
+        description: transactionDescription.trim() + (installmentCount > 1 ? " - Parcela " + (index + 1) + "/" + installmentCount : ""),
+        amountCents: base + (index < remainder ? 1 : 0),
+        importKey: "manual-card:" + groupId + ":" + (index + 1),
+        categoryId: category?.id,
+        subcategoryId: category?.subcategories.find((item) => item.name === transactionSubcategory)?.id,
+        kind: "purchase" as const,
+      }));
+      setCardEntries((current) => [...current, ...created]);
+      resetTransactionForm();
+      return;
+    }
     const accountId = Number(transactionAccount);
 
     if (!accounts.some((account) => account.id === accountId)) {
@@ -977,7 +1005,23 @@ if (amountCents <= 0) {
                     />
                   </label>
 
-                  <label className="space-y-2">
+                  {transactionType === "expense" && (
+                    <div className="space-y-2 md:col-span-2">
+                      <span className="text-xs font-medium text-[#64748B]">Forma de pagamento</span>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button type="button" onClick={() => setPaymentMethod("debit")} className={paymentMethod === "debit" ? "rounded-2xl border border-sky-300 bg-sky-100/70 px-4 py-3 text-sm backdrop-blur-xl" : "rounded-2xl border border-white/80 bg-white/60 px-4 py-3 text-sm backdrop-blur-xl"}>Débito / conta</button>
+                        <button type="button" onClick={() => setPaymentMethod("credit")} className={paymentMethod === "credit" ? "rounded-2xl border border-sky-300 bg-sky-100/70 px-4 py-3 text-sm backdrop-blur-xl" : "rounded-2xl border border-white/80 bg-white/60 px-4 py-3 text-sm backdrop-blur-xl"}>Crédito</button>
+                      </div>
+                    </div>
+                  )}
+                  {transactionType === "expense" && paymentMethod === "credit" && (
+                    <>
+                      <label className="space-y-2"><span className="text-xs font-medium text-[#64748B]">Cartão</span><select value={selectedCreditCard} onChange={(e) => setSelectedCreditCard(e.target.value as CardEntry["card"])} className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm"><option>Nubank Crédito</option><option>Inter Crédito</option></select></label>
+                      <label className="space-y-2"><span className="text-xs font-medium text-[#64748B]">Parcelas (1 a 48)</span><input type="number" min={1} max={48} value={installmentCount} onChange={(e) => setInstallmentCount(Number(e.target.value))} className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm" /></label>
+                      <p className="text-xs text-[#77879B] md:col-span-2">Parcelas nas faturas, sem alterar saldo bancário. Datas provisórias: primeiro vencimento dia 8 do mês seguinte; não use para compras reais até configurarmos o ciclo do cartão.</p>
+                    </>
+                  )}
+                  {(transactionType !== "expense" || paymentMethod === "debit") && <label className="space-y-2">
                     <span className="text-xs font-medium text-[#64748B]">
                       {transactionType === "transfer" ? "Conta de origem" : "Conta"}
                     </span>
@@ -992,7 +1036,7 @@ if (amountCents <= 0) {
                         </option>
                       ))}
                     </select>
-                  </label>
+                  </label>}
 
                   {transactionType === "transfer" ? (
                     <label className="space-y-2 md:col-span-2">
