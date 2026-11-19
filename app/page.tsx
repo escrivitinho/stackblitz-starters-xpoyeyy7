@@ -1023,9 +1023,12 @@ if (amountCents <= 0) {
               </div>
 
               <p className="mt-8 text-xs font-medium uppercase tracking-wider text-[#8494A8]">Saldo atual</p>
-              <h3 className="mt-2 text-4xl font-semibold tracking-tight text-[#233C5B]">
+              <h3 className={`mt-2 text-4xl font-semibold tracking-tight ${calculateAccountBalance(selectedAccount, transactions) !== null && calculateAccountBalance(selectedAccount, transactions)! < 0 ? "text-rose-700" : "text-[#233C5B]"}`}>
                 {money(calculateAccountBalance(selectedAccount, transactions))}
               </h3>
+              {calculateAccountBalance(selectedAccount, transactions) !== null && calculateAccountBalance(selectedAccount, transactions)! < 0 && (
+                <p className="mt-2 text-xs font-medium text-rose-700">⚠ Saldo negativo</p>
+              )}
               <p className="mt-3 text-xs text-[#8B9AAD]">
                 {selectedAccount.source === "manual"
                   ? "Saldo calculado a partir do saldo inicial"
@@ -1258,9 +1261,12 @@ if (amountCents <= 0) {
                   </div>
                   <div className="relative mt-7 border-t border-[#E9EEF4] pt-5">
                     <p className="text-xs text-[#8A98AA]">Saldo da conta</p>
-                    <p className="mt-2 text-2xl font-semibold tracking-tight text-[#263D59]">
+                    <p className={`mt-2 text-2xl font-semibold tracking-tight ${calculateAccountBalance(account, transactions) !== null && calculateAccountBalance(account, transactions)! < 0 ? "text-rose-700" : "text-[#263D59]"}`}>
                       {money(calculateAccountBalance(account, transactions))}
                     </p>
+                    {calculateAccountBalance(account, transactions) !== null && calculateAccountBalance(account, transactions)! < 0 && (
+                      <p className="mt-2 text-xs font-medium text-rose-700">⚠ Saldo negativo</p>
+                    )}
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                       <span className="rounded-full border border-blue-100 bg-blue-50/70 px-3 py-1.5 text-[10px] font-medium text-blue-700">
                         {account.source === "manual" ? "Saldo calculado a partir do saldo inicial" : account.source === "statement" ? "Saldo calculado por extrato" : "Saldo ainda não informado"}
