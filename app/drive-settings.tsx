@@ -294,7 +294,7 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
         if (!/<OFX>/i.test(raw)) throw new Error("OFX inválido: " + file.name + ". Nada foi importado.");
         const entries = parseOfx(raw);
         const blockCount = (raw.match(/<STMTTRN\b/gi) || []).length;
-        if (!entries.length || entries.length !== blockCount) throw new Error("Movimentações inválidas ou incompletas em " + file.name + ". Nada foi importado.");
+        if (!entries.length || entries.length !== blockCount) throw new Error("O arquivo " + file.name + " contém " + blockCount + " blocos STMTTRN, mas apenas " + entries.length + " movimentações válidas. Nenhum lançamento foi importado. Abra a Prévia OFX desse arquivo para investigar os registros ignorados.");
         for (const entry of entries) {
           const date = entry.date.slice(6, 10) + "-" + entry.date.slice(3, 5) + "-" + entry.date.slice(0, 2);
           const amountCents = Math.round(Math.abs(entry.amount) * 100);
