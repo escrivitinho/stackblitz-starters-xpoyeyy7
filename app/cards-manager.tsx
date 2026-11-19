@@ -18,6 +18,35 @@ export type CardEntry = {
 
 type Draft = Omit<CardEntry, "id">;
 
+// Regras locais baseadas apenas em classificações confirmadas pelo usuário.
+// Não removemos números nem partes de nomes para evitar associar lojas diferentes.
+function merchantKey(description: string): string {
+  return description.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function findSuggestion(entry: CardEntry, entries: CardEntry[], categories: Category[]) {
+  if (entry.categoryId || entry.amountCents <= 0 || (entry.kind && entry.kind !== "purchase")) return null;
+  const matches = entries.filter((candidate) =>
+    candidate.id !== entry.id &&
+    candidate.categoryId &&
+    candidate.amountCents > 0 &&
+    (candidate.kind ?? "purchase") === "purchase" &&
+    merchantKey(candidate.description) === merchantKey(entry.description) &&
+    categories.some((category) => category.type === "expense" && category.id === candidate.categoryId &&
+      (!candidate.subcategoryId || category.subcategories.some((sub) => sub.id === candidate.subcategoryId)))
+  );
+  if (!matches.length) return null;
+  const counts = new Map<string, { count: number; categoryId: string; subcategoryId?: string }>();
+  for (const match of matches) {
+    const key = JSON.stringify([match.categoryId, match.subcategoryId ?? ""]);
+    const prior = counts.get(key);
+    counts.set(key, { count: (prior?.count ?? 0) + 1, categoryId: match.categoryId!, subcategoryId: match.subcategoryId });
+  }
+  const ranked = [...counts.values()].sort((a, b) => b.count - a.count);
+  if (ranked.length > 1 && ranked[0].count === ranked[1].count) return null;
+  return ranked[0];
+}
+
 function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [], field = "", quoted = false;
@@ -135,7 +164,7 @@ export default function CardsManager({ entries, onChange, categories }: { entrie
       </section>
       {entries.length > 0 && <section className="rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm backdrop-blur-2xl">
         <h3 className="text-lg font-semibold text-[#26364D]">Movimentações dos cartões</h3>
-        <p className="mt-2 text-sm text-[#77879B]">Classifique cada registro. Pagamentos e estornos não são despesas novas. As alterações são salvas automaticamente neste navegador.</p>
+        <p className="mt-2 text-sm text-[#77879B]">Classifique cada registro. Ao reconhecer uma descrição já classificada, o MONEO sugere a mesma categoria para você aprovar. Pagamentos e estornos não recebem sugestões. As alterações são salvas neste navegador.</p>
         <div className="mt-5 flex flex-wrap gap-3">
           <label className="text-xs text-[#64748B]">Cartão<select aria-label="Filtrar cartão" className="mt-1 block rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-sm" value={cardFilter} onChange={(e) => setCardFilter(e.target.value)}><option>Todos</option><option>Nubank Crédito</option><option>Inter Crédito</option></select></label>
           <label className="text-xs text-[#64748B]">Mês<select aria-label="Filtrar mês" className="mt-1 block rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-sm" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}><option>Todos</option>{months.map((month) => <option key={month} value={month}>{month.slice(5)}/{month.slice(0, 4)}</option>)}</select></label>
@@ -149,11 +178,18 @@ export default function CardsManager({ entries, onChange, categories }: { entrie
           {filtered.map((entry) => {
             const kind = entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase");
             const category = expenseCategories.find((item) => item.id === entry.categoryId);
+            const suggestion = kind === "purchase" ? findSuggestion(entry, entries, categories) : null;
+            const suggestedCategory = suggestion ? expenseCategories.find((item) => item.id === suggestion.categoryId) : undefined;
+            const suggestedSubcategory = suggestedCategory?.subcategories.find((item) => item.id === suggestion?.subcategoryId);
             return <div key={entry.id} className="rounded-2xl border border-[#E5EAF0] bg-white/75 p-4">
               <div className="flex flex-wrap justify-between gap-3">
                 <div className="min-w-0"><p className="font-medium text-[#26364D]">{entry.description}</p><p className="mt-1 text-xs text-[#77879B]">{entry.date.split("-").reverse().join("/")} · {entry.card}</p></div>
                 <p className={`font-semibold ${entry.amountCents < 0 ? "text-emerald-700" : "text-[#B65D58]"}`}>{entry.amountCents < 0 ? "−" : ""}{formatCents(Math.abs(entry.amountCents))}</p>
               </div>
+              {suggestion && suggestedCategory && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-200/80 bg-sky-50/80 px-3 py-2">
+                <p className="text-xs text-[#395D7A]">Sugestão baseada em compras classificadas com a mesma descrição: <strong>{suggestedCategory.name}{suggestedSubcategory ? " → " + suggestedSubcategory.name : ""}</strong></p>
+                <button type="button" onClick={() => updateEntry(entry.id, { categoryId: suggestion.categoryId, subcategoryId: suggestion.subcategoryId })} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-[#294263] shadow-sm ring-1 ring-sky-200 hover:bg-sky-100">Aplicar sugestão</button>
+              </div>}
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <label className="text-xs text-[#64748B]">Tipo<select aria-label={"Tipo: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm" value={kind} onChange={(e) => updateEntry(entry.id, { kind: e.target.value as CardEntry["kind"], categoryId: undefined, subcategoryId: undefined })}><option value="purchase">Compra</option><option value="credit">Crédito / estorno</option><option value="payment">Pagamento da fatura</option></select></label>
                 <label className="text-xs text-[#64748B]">Categoria<select disabled={kind !== "purchase"} aria-label={"Categoria: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm disabled:opacity-40" value={entry.categoryId ?? ""} onChange={(e) => updateEntry(entry.id, { categoryId: e.target.value || undefined, subcategoryId: undefined })}><option value="">Não classificada</option>{expenseCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
