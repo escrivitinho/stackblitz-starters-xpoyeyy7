@@ -1510,7 +1510,7 @@ if (amountCents <= 0) {
           </div>
         )}
 
-        {active === "Configurações" && <DriveSettings transactions={transactions} accounts={accounts} />}
+        {active === "Configurações" && <DriveSettings transactions={transactions} accounts={accounts} categories={categories} onImport={(items) => setTransactions((current) => [...current, ...items])} />}
 
         {!["Visão geral", "Contas", "Lançamentos", "Categorias", "Configurações"].includes(active) && (
           <div className="flex min-h-[420px] flex-col items-center justify-center rounded-3xl border border-white/90 bg-white/55 p-8 text-center shadow-sm backdrop-blur-2xl">
