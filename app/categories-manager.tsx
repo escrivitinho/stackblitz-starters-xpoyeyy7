@@ -8,12 +8,14 @@ export type Category = {
   id: string;
   name: string;
   type: CategoryType;
-  subcategories: string[];
+  subcategories: { id: string; name: string }[];
 };
 
 type Props = {
   categories: Category[];
   onChange: (categories: Category[]) => void;
+  usedCategoryIds: string[];
+  usedSubcategoryIds: string[];
 };
 
 const typeLabels: Record<CategoryType, string> = {
@@ -55,13 +57,13 @@ const typeStyles: Record<CategoryType, string> = {
   transfer: "bg-blue-50 text-blue-700",
 };
 
-export default function CategoriesManager({ categories, onChange }: Props) {
+export default function CategoriesManager({ categories, onChange, usedCategoryIds, usedSubcategoryIds }: Props) {
   const [name, setName] = useState("");
   const [type, setType] = useState<CategoryType>("expense");
   const [subcategoryDrafts, setSubcategoryDrafts] = useState<Record<string, string>>({});
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
-  const [editingSubcategory, setEditingSubcategory] = useState<{ categoryId: string; originalName: string } | null>(null);
+  const [editingSubcategory, setEditingSubcategory] = useState<{ categoryId: string; subcategoryId: string } | null>(null);
   const [editingSubcategoryName, setEditingSubcategoryName] = useState("");
   const [error, setError] = useState("");
 
@@ -132,6 +134,10 @@ export default function CategoriesManager({ categories, onChange }: Props) {
   }
 
   function removeCategory(category: Category) {
+    if (usedCategoryIds.includes(category.id) || category.subcategories.some((sub) => usedSubcategoryIds.includes(sub.id))) {
+      setError("Esta categoria possui lançamentos vinculados e não pode ser excluída.");
+      return;
+    }
     if (!confirm(`Excluir a categoria "${category.name}" e suas subcategorias?`)) return;
     onChange(categories.filter((item) => item.id !== category.id));
     if (editingCategoryId === category.id) setEditingCategoryId(null);
@@ -141,21 +147,21 @@ export default function CategoriesManager({ categories, onChange }: Props) {
     const clean = (subcategoryDrafts[categoryId] ?? "").trim();
     const category = categories.find((item) => item.id === categoryId);
     if (!category || !clean) return;
-    if (category.subcategories.some((item) => item.toLocaleLowerCase("pt-BR") === clean.toLocaleLowerCase("pt-BR"))) {
+    if (category.subcategories.some((item) => item.name.toLocaleLowerCase("pt-BR") === clean.toLocaleLowerCase("pt-BR"))) {
       setError("Essa subcategoria já existe nesta categoria.");
       return;
     }
     onChange(categories.map((item) =>
       item.id === categoryId
-        ? { ...item, subcategories: [...item.subcategories, clean] }
+        ? { ...item, subcategories: [...item.subcategories, { id: `subcategory-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: clean }] }
         : item
     ));
     setSubcategoryDrafts((drafts) => ({ ...drafts, [categoryId]: "" }));
     setError("");
   }
 
-  function startEditingSubcategory(categoryId: string, value: string) {
-    setEditingSubcategory({ categoryId, originalName: value });
+  function startEditingSubcategory(categoryId: string, subcategoryId: string, value: string) {
+    setEditingSubcategory({ categoryId, subcategoryId });
     setEditingSubcategoryName(value);
     setError("");
   }
@@ -171,8 +177,8 @@ export default function CategoriesManager({ categories, onChange }: Props) {
     if (!category) return;
     const duplicate = category.subcategories.some(
       (item) =>
-        item !== editingSubcategory.originalName &&
-        item.toLocaleLowerCase("pt-BR") === clean.toLocaleLowerCase("pt-BR")
+        item.id !== editingSubcategory.subcategoryId &&
+        item.name.toLocaleLowerCase("pt-BR") === clean.toLocaleLowerCase("pt-BR")
     );
     if (duplicate) {
       setError("Essa subcategoria já existe nesta categoria.");
@@ -183,7 +189,7 @@ export default function CategoriesManager({ categories, onChange }: Props) {
         ? {
             ...item,
             subcategories: item.subcategories.map((sub) =>
-              sub === editingSubcategory.originalName ? clean : sub
+              sub.id === editingSubcategory.subcategoryId ? { ...sub, name: clean } : sub
             ),
           }
         : item
@@ -193,13 +199,17 @@ export default function CategoriesManager({ categories, onChange }: Props) {
     setError("");
   }
 
-  function removeSubcategory(categoryId: string, value: string) {
+  function removeSubcategory(categoryId: string, subcategoryId: string) {
+    if (usedSubcategoryIds.includes(subcategoryId)) {
+      setError("Esta subcategoria possui lançamentos vinculados e não pode ser excluída.");
+      return;
+    }
     onChange(categories.map((category) =>
       category.id === categoryId
-        ? { ...category, subcategories: category.subcategories.filter((item) => item !== value) }
+        ? { ...category, subcategories: category.subcategories.filter((item) => item.id !== subcategoryId) }
         : category
     ));
-    if (editingSubcategory?.categoryId === categoryId && editingSubcategory.originalName === value) {
+    if (editingSubcategory?.categoryId === categoryId && editingSubcategory.subcategoryId === subcategoryId) {
       setEditingSubcategory(null);
     }
   }
@@ -256,6 +266,7 @@ export default function CategoriesManager({ categories, onChange }: Props) {
 
           <div className="mt-7 border-t border-[#E9EEF4] pt-5">
             <h4 className="mb-3 text-sm font-semibold text-[#354B68]">Categorias de {typeLabels[type].toLowerCase()} cadastradas</h4>
+            {error && <p role="alert" className="mb-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
             {categories.filter((category) => category.type === type).length === 0 ? <p className="py-6 text-center text-sm text-[#94A0AF]">Nenhuma categoria cadastrada nesta aba.</p> : (
               <div className="space-y-2">
                 {categories.filter((category) => category.type === type).map((category) => (
@@ -291,9 +302,9 @@ export default function CategoriesManager({ categories, onChange }: Props) {
                     </div>
                     <div className="ml-2 mt-3 space-y-2 border-l-2 border-[#DCE5EF] pl-3">
                       {category.subcategories.length > 0 ? category.subcategories.map((item) => (
-                        <div key={item} className="flex items-center gap-2 rounded-lg px-2 py-1.5">
+                        <div key={item.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5">
                           <span className="text-xs text-[#A4B3C5]">↳</span>
-                          {editingSubcategory?.categoryId === category.id && editingSubcategory.originalName === item ? (
+                          {editingSubcategory?.categoryId === category.id && editingSubcategory.subcategoryId === item.id ? (
                             <div className="min-w-0 flex-1 space-y-2">
                               <input
                                 autoFocus
@@ -310,9 +321,9 @@ export default function CategoriesManager({ categories, onChange }: Props) {
                             </div>
                           ) : (
                             <>
-                              <span className="min-w-0 flex-1 text-sm text-[#52627A]">{item}</span>
-                              <button onClick={() => startEditingSubcategory(category.id, item)} className="rounded-lg border border-[#DCE5EF] bg-white/80 px-3 py-1.5 text-xs font-medium text-[#526B8B] hover:bg-white">✎ Editar</button>
-                              <button onClick={() => removeSubcategory(category.id, item)} className="rounded-lg px-2 py-1.5 text-xs text-rose-500 hover:bg-rose-50">Excluir</button>
+                              <span className="min-w-0 flex-1 text-sm text-[#52627A]">{item.name}</span>
+                              <button onClick={() => startEditingSubcategory(category.id, item.id, item.name)} className="rounded-lg border border-[#DCE5EF] bg-white/80 px-3 py-1.5 text-xs font-medium text-[#526B8B] hover:bg-white">✎ Editar</button>
+                              <button onClick={() => removeSubcategory(category.id, item.id)} className="rounded-lg px-2 py-1.5 text-xs text-rose-500 hover:bg-rose-50">Excluir</button>
                             </>
                           )}
                         </div>
