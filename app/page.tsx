@@ -130,8 +130,8 @@ export default function Home() {
     useState<Transaction[]>(initialTransactions);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
 
-  const [selectedAccount, setSelectedAccount] =
-    useState<Account | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+  const selectedAccount = accounts.find((account) => account.id === selectedAccountId) ?? null;
 
   // Formulário de contas
   const [showAccountForm, setShowAccountForm] = useState(false);
@@ -139,6 +139,7 @@ export default function Home() {
   const [accountType, setAccountType] = useState("Conta corrente");
   const [balanceMethod, setBalanceMethod] = useState("manual");
   const [initialBalance, setInitialBalance] = useState("");
+  const [openingBalanceDate, setOpeningBalanceDate] = useState(todayISO());
   const [accountError, setAccountError] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
 
@@ -183,7 +184,7 @@ const accountsWithBalance = accounts.filter(
 
   function goToPage(page: string) {
     setActive(page);
-    setSelectedAccount(null);
+    setSelectedAccountId(null);
     setShowAccountForm(false);
     setShowTransactionForm(false);
   }
@@ -198,6 +199,7 @@ const accountsWithBalance = accounts.filter(
     setAccountType("Conta corrente");
     setBalanceMethod("manual");
     setInitialBalance("");
+    setOpeningBalanceDate(todayISO());
     setAccountError("");
     setEditingId(null);
   }
@@ -212,6 +214,12 @@ const accountsWithBalance = accounts.filter(
 
 let openingBalanceCents: number | null = null;
     if (balanceMethod === "manual") {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(openingBalanceDate) ||
+          Number.isNaN(new Date(`${openingBalanceDate}T12:00:00`).getTime()) ||
+          new Date(`${openingBalanceDate}T12:00:00`).toISOString().slice(0, 10) !== openingBalanceDate) {
+        setAccountError("Informe uma data válida para o saldo inicial.");
+        return;
+      }
       if (!initialBalance.trim()) {
         setAccountError("Informe o saldo inicial da conta.");
         return;
@@ -229,9 +237,6 @@ openingBalanceCents = parseMoneyToCents(initialBalance);
 }
     }
 
-    const existingAccount = accounts.find(
-      (account) => account.id === editingId
-    );
 
   
 const newAccount: Account = {
@@ -241,7 +246,7 @@ const newAccount: Account = {
   openingBalanceCents,
   openingBalanceDate:
     openingBalanceCents !== null
-      ? new Date().toLocaleDateString("en-CA")
+      ? openingBalanceDate
       : null,
   source:
     balanceMethod === "manual" ? "manual" : "pending",
@@ -255,9 +260,6 @@ const newAccount: Account = {
         )
       );
 
-      if (selectedAccount?.id === editingId) {
-        setSelectedAccount(newAccount);
-      }
     } else {
       setAccounts((current) => [...current, newAccount]);
     }
@@ -273,14 +275,15 @@ const newAccount: Account = {
     );
 
     setInitialBalance(
-      account.balanceCents === null
+      account.openingBalanceCents === null
         ? ""
-        : (account.balanceCents / 100).toLocaleString("pt-BR", {
+        : (account.openingBalanceCents / 100).toLocaleString("pt-BR", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })
     );
 
+    setOpeningBalanceDate(account.openingBalanceDate ?? todayISO());
     setEditingId(account.id);
     setAccountError("");
     setShowAccountForm(true);
@@ -311,7 +314,7 @@ const newAccount: Account = {
       );
 
       if (selectedAccount?.id === id) {
-        setSelectedAccount(null);
+        setSelectedAccountId(null);
       }
     }
   }
@@ -607,7 +610,7 @@ if (amountCents <= 0) {
                 <h3 className="mt-7 text-3xl font-semibold text-[#233C5B]">
                   {money(totalBalanceCents)}
                 </h3>
-                <p className="mt-2 text-xs text-[#7D8FA5]">Soma dos saldos informados nas contas</p>
+                <p className="mt-2 text-xs text-[#7D8FA5]">Saldos iniciais e movimentações nas contas</p>
               </div>
 
               <div className="group relative isolate overflow-hidden rounded-3xl border border-white/90 bg-white/65 p-6 shadow-[0_8px_32px_rgba(100,90,150,0.10)] backdrop-blur-2xl">
@@ -1021,11 +1024,11 @@ if (amountCents <= 0) {
 
               <p className="mt-8 text-xs font-medium uppercase tracking-wider text-[#8494A8]">Saldo atual</p>
               <h3 className="mt-2 text-4xl font-semibold tracking-tight text-[#233C5B]">
-                {money(selectedAccount.balanceCents)}
+                {money(calculateAccountBalance(selectedAccount, transactions))}
               </h3>
               <p className="mt-3 text-xs text-[#8B9AAD]">
                 {selectedAccount.source === "manual"
-                  ? "Saldo cadastrado manualmente"
+                  ? "Saldo calculado a partir do saldo inicial"
                   : selectedAccount.source === "statement"
                   ? "Saldo calculado por extrato"
                   : "Aguardando informação de saldo"}
@@ -1087,7 +1090,7 @@ if (amountCents <= 0) {
                 <div className="pointer-events-none absolute -right-10 -top-16 -z-10 h-36 w-36 rounded-full bg-sky-200/70 blur-[60px]" />
                 <p className="text-sm text-[#77879B]">Saldo consolidado</p>
                 <h3 className="mt-3 text-2xl font-semibold text-[#233C5B]">{money(totalBalanceCents)}</h3>
-                <p className="mt-2 text-xs text-[#8B9AAD]">Soma dos saldos informados</p>
+                <p className="mt-2 text-xs text-[#8B9AAD]">Saldos iniciais e movimentações</p>
               </div>
               <div className="rounded-3xl border border-white/90 bg-white/65 p-5 shadow-sm backdrop-blur-2xl">
                 <p className="text-sm text-[#77879B]">Contas cadastradas</p>
@@ -1199,6 +1202,18 @@ if (amountCents <= 0) {
                   </label>
                 )}
 
+                {balanceMethod === "manual" && (
+                  <label className="mt-5 block space-y-2">
+                    <span className="text-xs font-medium text-[#64748B]">Data do saldo inicial</span>
+                    <input
+                      type="date"
+                      value={openingBalanceDate}
+                      onChange={(e) => { setOpeningBalanceDate(e.target.value); setAccountError(""); }}
+                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#7898BF] md:max-w-sm"
+                    />
+                  </label>
+                )}
+
                 {balanceMethod === "statement" && (
                   <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
                     <p className="text-sm font-medium text-[#456486]">Importação de extrato</p>
@@ -1230,7 +1245,7 @@ if (amountCents <= 0) {
                 <div key={account.id} className="group relative overflow-hidden rounded-3xl border border-white/90 bg-white/65 p-5 shadow-[0_8px_32px_rgba(80,110,150,0.07)] backdrop-blur-2xl transition hover:shadow-[0_12px_38px_rgba(80,110,150,0.13)]">
                   <div className="pointer-events-none absolute -right-12 -top-16 h-40 w-40 rounded-full bg-sky-100/70 blur-[60px]" />
                   <div className="relative flex items-start justify-between gap-3">
-                    <button onClick={() => setSelectedAccount(account)} className="flex items-center gap-3 text-left">
+                    <button onClick={() => setSelectedAccountId(account.id)} className="flex items-center gap-3 text-left">
                       <AccountLogo name={account.name} />
                       <div>
                         <h4 className="font-semibold text-[#2D405A]">{account.name}</h4>
@@ -1244,17 +1259,17 @@ if (amountCents <= 0) {
                   <div className="relative mt-7 border-t border-[#E9EEF4] pt-5">
                     <p className="text-xs text-[#8A98AA]">Saldo da conta</p>
                     <p className="mt-2 text-2xl font-semibold tracking-tight text-[#263D59]">
-                      {money(account.balanceCents)}
+                      {money(calculateAccountBalance(account, transactions))}
                     </p>
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                       <span className="rounded-full border border-blue-100 bg-blue-50/70 px-3 py-1.5 text-[10px] font-medium text-blue-700">
-                        {account.source === "manual" ? "Saldo informado manualmente" : account.source === "statement" ? "Saldo calculado por extrato" : "Saldo ainda não informado"}
+                        {account.source === "manual" ? "Saldo calculado a partir do saldo inicial" : account.source === "statement" ? "Saldo calculado por extrato" : "Saldo ainda não informado"}
                       </span>
                       <button onClick={() => removeAccount(account.id)} className="text-xs text-[#A0AABA] hover:text-rose-600">
                         Excluir conta
                       </button>
                     </div>
-                    <button onClick={() => setSelectedAccount(account)} className="mt-5 w-full rounded-xl border border-[#DCE5EF] bg-white/60 px-4 py-3 text-xs font-semibold text-[#526B8B] transition hover:bg-white">
+                    <button onClick={() => setSelectedAccountId(account.id)} className="mt-5 w-full rounded-xl border border-[#DCE5EF] bg-white/60 px-4 py-3 text-xs font-semibold text-[#526B8B] transition hover:bg-white">
                       Ver detalhes da conta →
                     </button>
                   </div>
