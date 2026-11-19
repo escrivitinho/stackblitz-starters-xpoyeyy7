@@ -998,7 +998,7 @@ if (amountCents <= 0) {
         {active === "Contas" && selectedAccount && (
           <div className="space-y-6">
             <button
-              onClick={() => setSelectedAccount(null)}
+              onClick={() => setSelectedAccountId(null)}
               className="flex items-center gap-2 rounded-xl border border-white/90 bg-white/60 px-4 py-2.5 text-sm font-medium text-[#526B8B] shadow-sm backdrop-blur-xl hover:bg-white"
             >
               ← Voltar para minhas contas
