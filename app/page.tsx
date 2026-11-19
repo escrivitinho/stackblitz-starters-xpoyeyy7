@@ -588,7 +588,7 @@ if (amountCents <= 0) {
 
     if (transactionType === "expense" && paymentMethod === "credit") {
       const installments = isInstallment ? installmentCount : 1;
-      if (!/^\\d{6}$/.test(invoiceCompetence) || Number(invoiceCompetence.slice(0, 2)) < 1 || Number(invoiceCompetence.slice(0, 2)) > 12 || Number(invoiceCompetence.slice(2)) < 2000) {
+      if (!/^\d{6}$/.test(invoiceCompetence) || Number(invoiceCompetence.slice(0, 2)) < 1 || Number(invoiceCompetence.slice(0, 2)) > 12 || Number(invoiceCompetence.slice(2)) < 2000) {
         setTransactionError("Informe uma competência válida no formato MMAAAA."); return;
       }
       if (!Number.isInteger(installments) || installments < 1 || installments > 48) {
@@ -1028,7 +1028,7 @@ if (amountCents <= 0) {
                       <label className="space-y-2">
                         <span className="text-xs font-medium text-[#64748B]">Competência da fatura (MM/AAAA)</span>
                         <input value={invoiceCompetence.length > 2 ? invoiceCompetence.slice(0, 2) + "/" + invoiceCompetence.slice(2) : invoiceCompetence}
-                          onChange={(e) => setInvoiceCompetenceOverride(e.target.value.replace(/\\D/g, "").slice(0, 6))}
+                          onChange={(e) => setInvoiceCompetenceOverride(e.target.value.replace(/\D/g, "").slice(0, 6))}
                           inputMode="numeric" maxLength={7} placeholder="MMAAAA"
                           className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF]" />
                       </label>
