@@ -671,7 +671,7 @@ if (amountCents <= 0) {
     <main className="moneo-app min-h-screen bg-[#F5F5F7] text-[#202B3C] md:flex">
 
       {/* MENU LATERAL */}
-      <aside className="moneo-sidebar flex w-full flex-col bg-white/55 px-5 py-6 text-[#34383F] md:fixed md:inset-y-0 md:w-[250px]">
+      <aside className="moneo-sidebar flex w-full flex-col bg-white/55 px-5 py-6 text-[#34383F] md:fixed md:inset-y-0 md:h-dvh md:w-[250px] md:overflow-y-auto md:overscroll-contain">
         <div className="mb-10 flex items-center gap-3 px-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#D8E5F5] text-xl font-bold text-[#14243D]">
             M
@@ -719,7 +719,7 @@ if (amountCents <= 0) {
           </button>
         </div>
 
-        <div className="mt-auto hidden border-t border-white/60 pt-5 md:block">
+        <div className="mt-auto hidden shrink-0 border-t border-white/60 pt-5 md:block">
           <button
             onClick={() => goToPage("Configurações")}
             className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-400 hover:bg-white/35"
