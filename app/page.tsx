@@ -175,7 +175,7 @@ export default function Home() {
         Math.abs(Date.parse(incoming.date + "T12:00:00Z") - Date.parse(outgoing.date + "T12:00:00Z")) <= 3 * 86400000 &&
         /transfer[eê]ncia|\bpix\b|ted|doc/i.test(incoming.description)
       );
-      return candidates.length === 1 ? [{ outgoing, incoming: candidates[0] }] : [];
+      return candidates.length === 1 && candidates[0].type === "income" ? [{ outgoing, incoming: candidates[0] }] : [];
     })
     .filter(({ incoming }) => transactions.filter((item) =>
       item.type === "expense" && item.accountId !== incoming.accountId &&
