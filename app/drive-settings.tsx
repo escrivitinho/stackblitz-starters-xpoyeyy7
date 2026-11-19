@@ -266,7 +266,7 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
     setAuditing(true);
     setError("");
     setAuditResults(null);
-    const output: Array<{ id: string; name: string; bank: string; total: number; pending: number; existing: number; review: number; error?: string }> = [];
+    const output: Array<{ id: string; name: string; bank: string; total: number; pending: number; existing: number; review: number; empty?: boolean; error?: string }> = [];
     const norm = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
     const seenIds = new Set<string>();
     const seenDetails = new Set<string>();
