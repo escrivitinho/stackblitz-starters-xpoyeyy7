@@ -160,6 +160,8 @@ export default function Home() {
     useState<Transaction[]>(initialTransactions);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [cardEntries, setCardEntries] = useState<CardEntry[]>([]);
+  const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
+  const [transactionTab, setTransactionTab] = useState<"all" | "pending">("all");
   // Persistência local: carregar após a hidratação e só salvar depois da leitura.
   const [storageLoaded, setStorageLoaded] = useState(false);
   const [backupMessage, setBackupMessage] = useState("");
@@ -174,6 +176,7 @@ export default function Home() {
           const stored = data as Record<string, unknown>;
           if (Array.isArray(stored.accounts)) setAccounts(stored.accounts as Account[]);
           if (Array.isArray(stored.cardEntries)) setCardEntries(stored.cardEntries as CardEntry[]);
+          if (Array.isArray(stored.pendingTransactions)) setPendingTransactions(stored.pendingTransactions as Transaction[]);
           const loadedCategories = Array.isArray(stored.categories)
             ? normalizeCategories(stored.categories as Category[])
             : initialCategories;
@@ -195,12 +198,12 @@ export default function Home() {
     try {
       window.localStorage.setItem(
         "moneo-finance-v1",
-        JSON.stringify({ accounts, transactions, categories, cardEntries })
+        JSON.stringify({ accounts, transactions, categories, cardEntries, pendingTransactions })
       );
     } catch (error) {
       console.error("Não foi possível salvar os dados locais do MONEO.", error);
     }
-  }, [accounts, transactions, categories, cardEntries, storageLoaded]);
+  }, [accounts, transactions, categories, cardEntries, pendingTransactions, storageLoaded]);
 
 
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
@@ -265,6 +268,7 @@ const accountsWithBalance = accounts.filter(
       transactions,
       categories,
       cardEntries,
+      pendingTransactions,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -339,12 +343,13 @@ const accountsWithBalance = accounts.filter(
       const restoredTransactions = migrateTransactions(data.transactions as Transaction[], restoredCategories);
       // Persistir primeiro: evita mostrar dados restaurados se o navegador estiver sem espaço.
       window.localStorage.setItem("moneo-finance-v1", JSON.stringify({
-        accounts: data.accounts, transactions: restoredTransactions, categories: restoredCategories, cardEntries: data.cardEntries ?? [],
+        accounts: data.accounts, transactions: restoredTransactions, categories: restoredCategories, cardEntries: data.cardEntries ?? [], pendingTransactions: Array.isArray(data.pendingTransactions) ? data.pendingTransactions : [],
       }));
       setAccounts(data.accounts as Account[]);
       setCategories(restoredCategories);
       setTransactions(restoredTransactions);
       setCardEntries((data.cardEntries ?? []) as CardEntry[]);
+      setPendingTransactions((Array.isArray(data.pendingTransactions) ? data.pendingTransactions : []) as Transaction[]);
       setSelectedAccountId(null);
       setBackupMessage("Backup restaurado com sucesso neste navegador.");
     } catch (error) {
@@ -1057,6 +1062,22 @@ if (amountCents <= 0) {
               </div>
             )}
 
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setTransactionTab("all")} className={`rounded-xl px-4 py-2 text-sm font-semibold ${transactionTab === "all" ? "bg-[#34383F] text-white" : "border border-[#DCE5EF] bg-white text-[#526B8B]"}`}>Todos os lançamentos ({transactions.length})</button>
+              <button type="button" onClick={() => setTransactionTab("pending")} className={`rounded-xl px-4 py-2 text-sm font-semibold ${transactionTab === "pending" ? "bg-[#34383F] text-white" : "border border-[#DCE5EF] bg-white text-[#526B8B]"}`}>Pendentes verificação ({pendingTransactions.length})</button>
+            </div>
+            {transactionTab === "pending" && <div className="rounded-3xl border border-white/90 bg-white/65 p-5 shadow-sm md:p-6">
+              <h3 className="font-semibold text-[#26364D]">Pendentes verificação</h3>
+              <p className="mt-1 text-xs text-[#64748B]">Movimentações suspeitas não afetam saldos ou relatórios até serem aprovadas. Confira possíveis duplicidades antes de aprovar.</p>
+              {pendingTransactions.length === 0 ? <p className="mt-5 text-sm text-[#64748B]">Nenhuma movimentação aguardando verificação. As pendências de sincronizações anteriores só aparecerão após uma nova leitura dos extratos.</p> :
+                <div className="mt-4 space-y-2">{pendingTransactions.map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-[#EDF0F4] py-3">
+                  <div><p className="text-sm font-medium text-[#35445A]">{item.description}</p><p className="text-xs text-[#64748B]">{displayDate(item.date)} · {accounts.find((a) => a.id === (item.type === "transfer" ? item.fromAccountId : item.accountId))?.name || "Conta não encontrada"} · {item.externalId ? "Possível duplicidade" : "Identificador ausente"}</p></div>
+                  <div className="flex items-center gap-2"><span className="text-sm font-semibold">{item.type === "expense" ? "−" : "+"}{money(item.amountCents)}</span>
+                    <button type="button" className="rounded-lg bg-[#34383F] px-3 py-2 text-xs text-white" onClick={() => { if (!window.confirm("Confirmou que esta movimentação não está duplicada? Ela passará a afetar seus saldos.")) return; setTransactions((current) => [...current, { ...item, id: Math.max(Date.now(), ...current.map((t) => t.id + 1)) }]); setPendingTransactions((current) => current.filter((t) => t.id !== item.id)); }}>Aprovar</button>
+                    <button type="button" className="rounded-lg border border-[#DCE5EF] px-3 py-2 text-xs" onClick={() => { if (window.confirm("Descartar esta pendência?")) setPendingTransactions((current) => current.filter((t) => t.id !== item.id)); }}>Descartar</button>
+                  </div></div>)}</div>}
+            </div>}
+            {transactionTab === "all" && <>
             {/* LISTA */}
             <div className="rounded-3xl border border-white/90 bg-white/65 p-5 shadow-[0_8px_32px_rgba(80,110,150,0.07)] backdrop-blur-2xl md:p-6">
               <div className="mb-5">
@@ -1137,6 +1158,8 @@ if (amountCents <= 0) {
                 </div>
               )}
             </div>
+
+            </>}
 
             <p className="text-xs leading-5 text-[#94A0AF]">
               Os lançamentos são mantidos temporariamente em memória nesta versão.
@@ -1481,7 +1504,7 @@ if (amountCents <= 0) {
           </div>
         )}
 
-        {active === "Configurações" && <DriveSettings transactions={transactions} accounts={accounts} categories={categories} onImport={(items) => setTransactions((current) => [...current, ...items])} />}
+        {active === "Configurações" && <DriveSettings transactions={transactions} accounts={accounts} categories={categories} onImport={(items) => setTransactions((current) => [...current, ...items])} onPending={(items) => setPendingTransactions((current) => { const known = new Set(current.map((t) => t.importHash)); return [...current, ...items.filter((item) => !known.has(item.importHash))]; })} />}
 
         {!["Visão geral", "Contas", "Lançamentos", "Categorias", "Configurações"].includes(active) && (
           <div className="flex min-h-[420px] flex-col items-center justify-center rounded-3xl border border-white/90 bg-white/55 p-8 text-center shadow-sm backdrop-blur-2xl">
