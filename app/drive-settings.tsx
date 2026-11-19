@@ -18,12 +18,38 @@ const folders = [
   { label: "Faturas de cartões", path: "FINANCEIRO / FINANCEIRO 2026 / FATURAS", format: "CSV" },
 ];
 
+
+type FolderResult = { path: string; status: "found" | "missing" | "ambiguous" };
+type DriveItem = { id: string; name: string };
+
+async function findFolder(token: string, parent: string, name: string): Promise<DriveItem[]> {
+  const matches: DriveItem[] = [];
+  let pageToken: string | undefined;
+  do {
+    const escaped = name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const query = "'" + parent + "' in parents and name = '" + escaped + "' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
+    const params = new URLSearchParams({ q: query, fields: "nextPageToken,files(id,name)", pageSize: "100" });
+    if (pageToken) params.set("pageToken", pageToken);
+    const response = await fetch("https://www.googleapis.com/drive/v3/files?" + params.toString(), {
+      headers: { Authorization: "Bearer " + token },
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(response.status === 401 ? "A sessão expirou. Desconecte e conecte novamente." : "Erro ao consultar o Drive (" + response.status + ").");
+    const data = await response.json() as { files?: DriveItem[]; nextPageToken?: string };
+    matches.push(...(data.files || []));
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+  return matches;
+}
+
 export default function DriveSettings() {
   const [sdkReady, setSdkReady] = useState(false);
   const [connected, setConnected] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const tokenRef = useRef<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [results, setResults] = useState<FolderResult[] | null>(null);
 
   useEffect(() => {
     if (window.google?.accounts.oauth2) { setSdkReady(true); return; }
@@ -69,7 +95,42 @@ export default function DriveSettings() {
     const token = tokenRef.current;
     tokenRef.current = null;
     setConnected(false);
+    setResults(null);
     if (token && window.google?.accounts.oauth2) window.google.accounts.oauth2.revoke(token, () => {});
+  }
+
+
+  async function checkFolders() {
+    const token = tokenRef.current;
+    if (!token) return;
+    setChecking(true);
+    setError("");
+    setResults(null);
+    try {
+      const cache = new Map<string, DriveItem[]>();
+      const output: FolderResult[] = [];
+      for (const folder of folders) {
+        let parent = "root";
+        let status: FolderResult["status"] = "found";
+        for (const name of folder.path.split(" / ")) {
+          const key = parent + "/" + name;
+          let matches = cache.get(key);
+          if (!matches) {
+            matches = await findFolder(token, parent, name);
+            cache.set(key, matches);
+          }
+          if (matches.length === 0) { status = "missing"; break; }
+          if (matches.length > 1) { status = "ambiguous"; break; }
+          parent = matches[0].id;
+        }
+        output.push({ path: folder.path, status });
+      }
+      setResults(output);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao localizar pastas.");
+    } finally {
+      setChecking(false);
+    }
   }
 
   return (
@@ -89,11 +150,12 @@ export default function DriveSettings() {
         )}
         <p className="text-xs text-[#77879B]">A autorização permite leitura de todo o Drive, não apenas das pastas listadas. Nenhum arquivo será importado nesta etapa.</p>
       </div>
+      {connected && <div className="mt-4"><button type="button" disabled={checking} onClick={() => void checkFolders()} className="rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white disabled:opacity-50">{checking ? "Procurando pastas..." : "Localizar pastas no Drive"}</button><p className="mt-2 text-xs text-[#77879B]">Consulta apenas nomes e identificadores de pastas. Não lê nem importa arquivos financeiros.</p></div>}
       {error && <p role="alert" className="mt-3 text-sm text-rose-600">{error}</p>}
       {connected && <p role="status" className="mt-3 text-sm text-emerald-700">Autorização recebida nesta sessão. A sincronização ainda não está ativa.</p>}
       <div className="mt-5 rounded-2xl border border-[#E5EAF0] bg-white/70 p-4">
         <p className="text-sm font-semibold text-[#26364D]">Pastas planejadas</p>
-        <p className="mt-1 text-xs text-[#77879B]">Estas pastas são apenas referências. Estas pastas ainda não foram verificadas; nenhum arquivo foi lido.</p>
+        <p className="mt-1 text-xs text-[#77879B]">As pastas serão verificadas quando você clicar em Localizar pastas. Nenhum arquivo financeiro será lido.</p>
         <div className="mt-3 space-y-3">
           {folders.map((folder) => (
             <div key={folder.path} className="flex flex-wrap items-start justify-between gap-2 border-t border-[#E5EAF0] pt-3">
@@ -101,14 +163,17 @@ export default function DriveSettings() {
                 <p className="text-sm font-medium text-[#26364D]">{folder.label}</p>
                 <p className="break-words text-xs text-[#77879B]">{folder.path}</p>
               </div>
-              <span className="rounded-lg bg-[#F1F5F9] px-2 py-1 text-xs text-[#526F96]">{folder.format}</span>
+              <div className="flex items-center gap-2">
+                {results && <span className="text-xs font-medium text-[#526F96]">{results.find((item) => item.path === folder.path)?.status === "found" ? "Localizada" : results.find((item) => item.path === folder.path)?.status === "ambiguous" ? "Nome duplicado" : "Não localizada"}</span>}
+                <span className="rounded-lg bg-[#F1F5F9] px-2 py-1 text-xs text-[#526F96]">{folder.format}</span>
+              </div>
             </div>
           ))}
         </div>
       </div>
       <div className="mt-4 rounded-2xl bg-[#F4F7FA] p-4">
         <p className="text-sm font-semibold text-[#26364D]">Próximas etapas</p>
-        <p className="mt-2 text-sm leading-6 text-[#64748B]">Autorizar a conexão Google, localizar as pastas e conferir novos arquivos antes de importar. A autorização não ativa a sincronização.</p>
+        <p className="mt-2 text-sm leading-6 text-[#64748B]">Localizar as pastas no Drive e depois conferir novos arquivos antes de importar. A sincronização ainda não está ativa.</p>
         <p className="mt-2 text-xs text-[#77879B]">A sincronização ainda não está ativa. Seus lançamentos continuam armazenados apenas neste navegador; mantenha backups JSON atualizados.</p>
       </div>
     </section>
