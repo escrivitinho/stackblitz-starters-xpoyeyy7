@@ -1472,7 +1472,7 @@ if (amountCents <= 0) {
         {/* ================================== */}
 
         {active === "Cartões" && (
-          <CardsManager entries={cardEntries} onChange={setCardEntries} />
+          <CardsManager entries={cardEntries} onChange={setCardEntries} categories={categories} />
         )}
 
         {active === "Categorias" && (
