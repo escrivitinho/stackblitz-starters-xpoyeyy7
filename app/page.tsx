@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import CategoriesManager, { type Category } from "./categories-manager";
 import { formatCents, parseMoneyToCents } from "./lib/money";
 import {
@@ -129,6 +129,40 @@ export default function Home() {
   const [transactions, setTransactions] =
     useState<Transaction[]>(initialTransactions);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
+  // Persistência local: carregar após a hidratação e só salvar depois da leitura.
+  const [storageLoaded, setStorageLoaded] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("moneo-finance-v1");
+      if (saved) {
+        const data: unknown = JSON.parse(saved);
+        if (data && typeof data === "object") {
+          const stored = data as Record<string, unknown>;
+          if (Array.isArray(stored.accounts)) setAccounts(stored.accounts as Account[]);
+          if (Array.isArray(stored.transactions)) setTransactions(stored.transactions as Transaction[]);
+          if (Array.isArray(stored.categories)) setCategories(stored.categories as Category[]);
+        }
+      }
+    } catch (error) {
+      console.error("Não foi possível carregar os dados locais do MONEO.", error);
+    } finally {
+      setStorageLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!storageLoaded) return;
+    try {
+      window.localStorage.setItem(
+        "moneo-finance-v1",
+        JSON.stringify({ accounts, transactions, categories })
+      );
+    } catch (error) {
+      console.error("Não foi possível salvar os dados locais do MONEO.", error);
+    }
+  }, [accounts, transactions, categories, storageLoaded]);
+
 
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId) ?? null;
