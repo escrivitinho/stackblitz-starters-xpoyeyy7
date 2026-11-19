@@ -8,6 +8,8 @@ export type CardEntry = {
   id: string;
   card: "Nubank Crédito" | "Inter Crédito";
   date: string;
+  purchaseDate?: string;
+  paidFor?: string;
   description: string;
   amountCents: number;
   importKey: string;
