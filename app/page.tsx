@@ -827,36 +827,7 @@ if (amountCents <= 0) {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/90 bg-white/65 p-6 shadow-sm backdrop-blur-2xl">
-              <h3 className="font-semibold text-[#26364D]">Últimos lançamentos</h3>
-              <p className="mt-1 text-xs text-[#94A0AF]">
-                Movimentações cadastradas manualmente
-              </p>
 
-              {transactions.length === 0 ? (
-                <p className="mt-5 text-sm text-[#94A0AF]">
-                  Nenhum lançamento cadastrado ainda.
-                </p>
-              ) : (
-                <div className="mt-4 space-y-3">
-                  {transactions.slice(0, 5).map((transaction) => (
-                    <div key={transaction.id} className="flex justify-between gap-3 border-b border-[#EDF0F4] py-3 last:border-0">
-                      <div>
-                        <p className="text-sm font-medium text-[#35445A]">{transaction.description}</p>
-                        <p className="text-xs text-[#94A0AF]">{displayDate(transaction.date)} · {getCategoryNames(transaction).group}</p>
-                      </div>
-                      <span className={`text-sm font-semibold ${transaction.type === "income" ? "text-emerald-700" : "text-[#526176]"}`}>
-                        {transaction.type === "income" ? "+" : transaction.type === "expense" ? "−" : ""}
-                        {money(transaction.amountCents)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <button onClick={() => goToPage("Lançamentos")} className="mt-4 text-xs font-medium text-[#334B75]">
-                Ver lançamentos →
-              </button>
-            </div>
           </div>
         )}
 
