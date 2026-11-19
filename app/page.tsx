@@ -164,6 +164,26 @@ export default function Home() {
   const [transactionTab, setTransactionTab] = useState<"all" | "pending">("all");
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "income" | "expense">("all");
   const [transactionMonthFilter, setTransactionMonthFilter] = useState("");
+  const [showTransferSuggestions, setShowTransferSuggestions] = useState(false);
+  const transferSuggestions = transactions
+    .filter((item) => item.type === "expense" && /transfer[eê]ncia|\bpix\b|ted|doc/i.test(item.description))
+    .flatMap((outgoing) => {
+      if (outgoing.type !== "expense") return [];
+      const candidates = transactions.filter((incoming) =>
+        incoming.type === "income" && incoming.accountId !== outgoing.accountId &&
+        incoming.amountCents === outgoing.amountCents &&
+        Math.abs(Date.parse(incoming.date + "T12:00:00Z") - Date.parse(outgoing.date + "T12:00:00Z")) <= 3 * 86400000 &&
+        /transfer[eê]ncia|\bpix\b|ted|doc/i.test(incoming.description)
+      );
+      return candidates.length === 1 ? [{ outgoing, incoming: candidates[0] }] : [];
+    })
+    .filter(({ incoming }) => transactions.filter((item) =>
+      item.type === "expense" && item.accountId !== incoming.accountId &&
+      item.amountCents === incoming.amountCents &&
+      Math.abs(Date.parse(item.date + "T12:00:00Z") - Date.parse(incoming.date + "T12:00:00Z")) <= 3 * 86400000 &&
+      /transfer[eê]ncia|\bpix\b|ted|doc/i.test(item.description)
+    ).length === 1);
+
   const filteredTransactions = transactions.filter((item) =>
     (transactionTypeFilter === "all" || item.type === transactionTypeFilter) &&
     (!transactionMonthFilter || item.date.startsWith(transactionMonthFilter))
@@ -1265,6 +1285,22 @@ if (amountCents <= 0) {
                 <div className="flex justify-end gap-3"><button type="button" onClick={() => setEditId(null)} className="rounded-xl border border-[#DCE5EF] bg-white px-5 py-3 text-sm">Cancelar</button><button type="button" onClick={saveEdit} className="rounded-xl bg-[#34383F] px-5 py-3 text-sm text-white">Salvar classificação</button></div>
               </div>
             </div>}
+            {transactionTab === "all" && <div className="rounded-3xl border border-white/90 bg-white/65 p-4 shadow-sm backdrop-blur-2xl md:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div><h3 className="text-sm font-semibold text-[#26364D]">Possíveis transferências entre contas</h3>
+                  <p className="mt-1 text-xs text-[#64748B]">Identificamos {transferSuggestions.length} par(es) com valores iguais, contas diferentes e datas próximas. Nenhum lançamento foi alterado.</p></div>
+                <button type="button" onClick={() => setShowTransferSuggestions((current) => !current)} className="rounded-xl border border-sky-200 bg-sky-100/80 px-4 py-2 text-xs font-semibold text-sky-900">{showTransferSuggestions ? "Ocultar sugestões" : "Conferir sugestões"}</button>
+              </div>
+              {showTransferSuggestions && <div className="mt-4 space-y-3">
+                {transferSuggestions.length === 0 ? <p className="text-xs text-[#64748B]">Nenhum par seguro encontrado com esses critérios. Isso não significa que não existam transferências.</p> :
+                  transferSuggestions.map(({ outgoing, incoming }) => <div key={String(outgoing.id) + ":" + String(incoming.id)} className="rounded-2xl border border-[#E2E8F0] bg-white/75 p-4">
+                    <p className="text-sm font-semibold text-[#26364D]">{money(outgoing.amountCents)} · possível transferência</p>
+                    <p className="mt-2 break-words text-xs text-[#64748B]">Saída: {displayDate(outgoing.date)} · {accounts.find((account) => account.id === outgoing.accountId)?.name || "Conta desconhecida"} · {outgoing.description}</p>
+                    <p className="mt-2 break-words text-xs text-[#64748B]">Entrada: {displayDate(incoming.date)} · {accounts.find((account) => account.id === incoming.accountId)?.name || "Conta desconhecida"} · {incoming.description}</p>
+                    <p className="mt-2 text-xs text-amber-700">Sugestão para conferência: pode envolver terceiros. Não afeta os totais até confirmarmos a origem e o destino.</p>
+                  </div>)}
+              </div>}
+            </div>}
             {transactionTab === "all" && <>
             {/* LISTA */}
             <div className="rounded-3xl border border-white/90 bg-white/65 p-5 shadow-[0_8px_32px_rgba(80,110,150,0.07)] backdrop-blur-2xl md:p-6">
@@ -1283,7 +1319,7 @@ if (amountCents <= 0) {
                       <button key={filter} type="button" onClick={() => setTransactionTypeFilter(filter)}
                         aria-pressed={transactionTypeFilter === filter}
                         className={`rounded-2xl border px-4 py-2.5 text-sm font-semibold backdrop-blur-xl transition-all ${transactionTypeFilter === filter
-                          ? filter === "income" ? "border-emerald-300 bg-emerald-100/80 text-emerald-900 shadow-sm" : filter === "expense" ? "border-rose-300 bg-rose-100/80 text-rose-900 shadow-sm" : "border-slate-300 bg-white/90 text-[#35445A] shadow-sm"
+                          ? filter === "income" ? "border-emerald-500 bg-emerald-500 text-white shadow-sm" : filter === "expense" ? "border-rose-500 bg-rose-500 text-white shadow-sm" : "border-slate-300 bg-white/90 text-[#35445A] shadow-sm"
                           : "border-white/90 bg-white/55 text-[#64748B] hover:bg-white/85"}`}>{label}</button>
                     ))}
                   </div>
