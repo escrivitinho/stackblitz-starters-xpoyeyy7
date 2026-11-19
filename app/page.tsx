@@ -814,7 +814,7 @@ if (amountCents <= 0) {
                   changeTransactionType(type);
                   setShowTransactionForm(true);
                   setActive("Lançamentos");
-                }} className="rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white shadow-sm hover:bg-[#25282D]">{label}</button>
+                }} className={`rounded-2xl border px-5 py-3 text-sm font-semibold backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 ${type === "income" ? "border-emerald-200/80 bg-gradient-to-br from-emerald-100/85 via-emerald-200/65 to-emerald-300/55 text-emerald-900 shadow-[0_6px_22px_rgba(16,185,129,0.13),inset_0_1px_1px_rgba(255,255,255,0.9)] hover:from-emerald-100 hover:to-emerald-300/75" : "border-rose-200/80 bg-gradient-to-br from-rose-100/85 via-rose-200/65 to-rose-300/55 text-rose-900 shadow-[0_6px_22px_rgba(244,63,94,0.12),inset_0_1px_1px_rgba(255,255,255,0.9)] hover:from-rose-100 hover:to-rose-300/75"}`}>{label}</button>
               ))}
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
