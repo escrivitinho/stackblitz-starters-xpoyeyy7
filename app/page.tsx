@@ -162,6 +162,13 @@ export default function Home() {
   const [cardEntries, setCardEntries] = useState<CardEntry[]>([]);
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
   const [transactionTab, setTransactionTab] = useState<"all" | "pending">("all");
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "income" | "expense">("all");
+  const [transactionMonthFilter, setTransactionMonthFilter] = useState("");
+  const filteredTransactions = transactions.filter((item) =>
+    (transactionTypeFilter === "all" || item.type === transactionTypeFilter) &&
+    (!transactionMonthFilter || item.date.startsWith(transactionMonthFilter))
+  );
+
   const [editId, setEditId] = useState<number | null>(null);
   const [editCategoryId, setEditCategoryId] = useState("");
   const [editSubcategoryId, setEditSubcategoryId] = useState("");
@@ -1264,18 +1271,39 @@ if (amountCents <= 0) {
               <div className="mb-5">
                 <h3 className="font-semibold text-[#26364D]">Todos os lançamentos</h3>
                 <p className="mt-1 text-xs text-[#94A0AF]">
-                  {transactions.length} movimentação(ões) registrada(s) nesta sessão
+                  Exibindo {filteredTransactions.length} de {transactions.length} movimentação(ões)
                 </p>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      ["all", "Todos"],
+                      ["income", "Receitas"],
+                      ["expense", "Despesas"],
+                    ] as const).map(([filter, label]) => (
+                      <button key={filter} type="button" onClick={() => setTransactionTypeFilter(filter)}
+                        aria-pressed={transactionTypeFilter === filter}
+                        className={`rounded-2xl border px-4 py-2.5 text-sm font-semibold backdrop-blur-xl transition-all ${transactionTypeFilter === filter
+                          ? filter === "income" ? "border-emerald-300 bg-emerald-100/80 text-emerald-900 shadow-sm" : filter === "expense" ? "border-rose-300 bg-rose-100/80 text-rose-900 shadow-sm" : "border-slate-300 bg-white/90 text-[#35445A] shadow-sm"
+                          : "border-white/90 bg-white/55 text-[#64748B] hover:bg-white/85"}`}>{label}</button>
+                    ))}
+                  </div>
+                  <label className="flex items-center gap-2 rounded-2xl border border-white/90 bg-white/65 px-3 py-2 backdrop-blur-xl">
+                    <span className="text-xs font-medium text-[#64748B]">Mês</span>
+                    <input type="month" value={transactionMonthFilter} onChange={(event) => setTransactionMonthFilter(event.target.value)}
+                      aria-label="Filtrar lançamentos por mês" className="min-w-0 bg-transparent text-sm text-[#35445A] outline-none" />
+                    {transactionMonthFilter && <button type="button" onClick={() => setTransactionMonthFilter("")} className="text-xs font-medium text-[#77879B] hover:text-[#35445A]">Limpar</button>}
+                  </label>
+                </div>
               </div>
 
-              {transactions.length === 0 ? (
+              {filteredTransactions.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-[#D5DFEA] bg-white/40 px-5 py-12 text-center">
                   <div className="text-3xl text-[#91A9C8]">⇄</div>
                   <h4 className="mt-3 font-medium text-[#43536A]">
-                    Nenhum lançamento por enquanto
+                    Nenhum lançamento encontrado
                   </h4>
                   <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-[#94A0AF]">
-                    Cadastre sua primeira receita, despesa ou transferência.
+                    Tente alterar os filtros ou cadastre uma nova receita, despesa ou transferência.
                   </p>
                   <button
                     onClick={() => setShowTransactionForm(true)}
@@ -1286,7 +1314,7 @@ if (amountCents <= 0) {
                 </div>
               ) : (
                 <div className="space-y-1">
-                  {transactions.map((transaction) => (
+                  {filteredTransactions.map((transaction) => (
                     <div
                       key={transaction.id}
                       onClick={() => startEdit(transaction)}
