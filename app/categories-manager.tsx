@@ -40,8 +40,14 @@ export default function CategoriesManager({ categories, onChange }: Props) {
 
   function resetForm() {
     setName("");
-    setType("expense");
     setError("");
+  }
+
+  function selectTab(nextType: CategoryType) {
+    setType(nextType);
+    setError("");
+    setEditingCategoryId(null);
+    setEditingSubcategory(null);
   }
 
   function saveCategory() {
@@ -66,7 +72,7 @@ export default function CategoriesManager({ categories, onChange }: Props) {
       type,
       subcategories: [],
     };
-    onChange([...categories, created]);
+    onChange([created, ...categories]);
     resetForm();
   }
 
@@ -182,24 +188,34 @@ export default function CategoriesManager({ categories, onChange }: Props) {
         ))}
       </div>
 
+      <div className="flex flex-wrap gap-2 rounded-2xl border border-[#E2E8F0] bg-white/65 p-2" role="tablist" aria-label="Tipos de categorias">
+        {(["income", "expense", "transfer"] as CategoryType[]).map((item) => (
+          <button
+            key={item}
+            type="button"
+            role="tab"
+            aria-selected={type === item}
+            onClick={() => selectTab(item)}
+            className={`rounded-xl px-5 py-3 text-sm font-medium transition ${type === item ? "bg-[#294263] text-white shadow-sm" : "text-[#526B8B] hover:bg-white"}`}
+          >
+            {item === "income" ? "Receitas" : item === "expense" ? "Despesas" : "Transferências"}
+            <span className={`ml-2 text-xs ${type === item ? "text-white/75" : "text-[#94A0AF]"}`}>
+              {categories.filter((category) => category.type === item).length}
+            </span>
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 gap-6">
         <section className="rounded-3xl border border-white/90 bg-white/65 p-5 shadow-sm backdrop-blur-2xl md:p-6">
           <div className="mb-5">
             <h3 className="font-semibold text-[#26364D]">Nova categoria</h3>
-            <p className="mt-1 text-xs text-[#94A0AF]">Organize suas receitas, despesas e transferências.</p>
+            <p className="mt-1 text-xs text-[#94A0AF]">Adicione uma categoria de {typeLabels[type].toLowerCase()}.</p>
           </div>
           <div className="space-y-4">
             <label className="block space-y-2">
               <span className="text-xs font-medium text-[#64748B]">Nome da categoria</span>
               <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Alimentação" className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#7898BF]" />
-            </label>
-            <label className="block space-y-2">
-              <span className="text-xs font-medium text-[#64748B]">Tipo</span>
-              <select value={type} onChange={(event) => setType(event.target.value as CategoryType)} className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none">
-                <option value="expense">Despesa</option>
-                <option value="income">Receita</option>
-                <option value="transfer">Transferência</option>
-              </select>
             </label>
             {error && !editingCategoryId && !editingSubcategory && <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
             <div className="flex justify-end">
@@ -208,10 +224,10 @@ export default function CategoriesManager({ categories, onChange }: Props) {
           </div>
 
           <div className="mt-7 border-t border-[#E9EEF4] pt-5">
-            <h4 className="mb-3 text-sm font-semibold text-[#354B68]">Categorias cadastradas</h4>
-            {categories.length === 0 ? <p className="py-6 text-center text-sm text-[#94A0AF]">Nenhuma categoria cadastrada.</p> : (
+            <h4 className="mb-3 text-sm font-semibold text-[#354B68]">Categorias de {typeLabels[type].toLowerCase()} cadastradas</h4>
+            {categories.filter((category) => category.type === type).length === 0 ? <p className="py-6 text-center text-sm text-[#94A0AF]">Nenhuma categoria cadastrada nesta aba.</p> : (
               <div className="space-y-2">
-                {categories.map((category) => (
+                {categories.filter((category) => category.type === type).map((category) => (
                   <div key={category.id} className="rounded-2xl border border-[#E9EEF4] bg-white/55 p-3">
                     <div className="flex items-center gap-2">
                       {editingCategoryId === category.id ? (
