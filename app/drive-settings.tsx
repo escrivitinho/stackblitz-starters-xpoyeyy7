@@ -78,6 +78,9 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [preview, setPreview] = useState<{ fileId: string; fileName: string; folderPath: string; entries: OfxEntry[]; skipped: number } | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState("");
+  const [syncSummary, setSyncSummary] = useState("");
   const [selectedRows, setSelectedRows] = useState<number[]>([]);
   const [importNotice, setImportNotice] = useState("");
 
@@ -244,6 +247,88 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
     }
   }
 
+  async function syncAllOfx() {
+    const token = tokenRef.current;
+    const bankFolders = folders.filter((folder) => folder.format === "OFX");
+    if (!token || !files || !results || syncing) return;
+    if (!bankFolders.every((folder) => results.some((result) => result.path === folder.path && result.status === "found"))) {
+      setError("Localize as três pastas bancárias antes de sincronizar.");
+      return;
+    }
+    const bankFiles = files.filter((file) => file.name.toLowerCase().endsWith(".ofx") && bankFolders.some((folder) => folder.path === file.folderPath));
+    if (!bankFiles.length) { setError("Nenhum extrato OFX disponível."); return; }
+    if (!window.confirm("Verificar " + bankFiles.length + " extratos OFX e importar automaticamente apenas movimentações novas? Possíveis duplicidades serão ignoradas. Faça um backup JSON antes de continuar.")) return;
+    setSyncing(true);
+    setError("");
+    setSyncSummary("");
+    let ignored = 0;
+    let reviewed = 0;
+    const staged: Transaction[] = [];
+    const normalizeText = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+    const keyFor = (date: string, type: string, amountCents: number, description: string, accountId: number) =>
+      [accountId, date, type, amountCents, normalizeText(description)].join("|");
+    const knownIds = new Set<string>();
+    const knownDetails = new Set<string>();
+    for (const transaction of transactions) {
+      if (transaction.type === "transfer") continue;
+      if (transaction.source === "ofx" && transaction.externalId) knownIds.add(transaction.accountId + "|" + transaction.externalId);
+      knownDetails.add(keyFor(transaction.date, transaction.type, transaction.amountCents, transaction.description, transaction.accountId));
+    }
+    try {
+      for (let index = 0; index < bankFiles.length; index++) {
+        const file = bankFiles[index];
+        setSyncProgress("Lendo extrato " + (index + 1) + " de " + bankFiles.length + ": " + file.name);
+        const accountName = file.folderPath.split(" / ").pop();
+        const account = accounts.find((item) => item.name.toLocaleUpperCase("pt-BR") === accountName?.toLocaleUpperCase("pt-BR"));
+        if (!account) throw new Error("Conta bancária não identificada para " + file.name + ". Nada foi importado.");
+        if (file.size && Number(file.size) > 5 * 1024 * 1024) throw new Error("Arquivo acima de 5 MB: " + file.name + ". Nada foi importado.");
+        const response = await fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(file.id) + "?alt=media", {
+          headers: { Authorization: "Bearer " + token }, cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Erro ao ler " + file.name + " (" + response.status + "). Nada foi importado.");
+        const buffer = await response.arrayBuffer();
+        if (buffer.byteLength > 5 * 1024 * 1024) throw new Error("Arquivo acima de 5 MB: " + file.name + ". Nada foi importado.");
+        const bytes = new Uint8Array(buffer);
+        const utf8 = new TextDecoder("utf-8").decode(bytes);
+        const raw = utf8.includes("\uFFFD") ? new TextDecoder("windows-1252").decode(bytes) : utf8;
+        if (!/<OFX>/i.test(raw)) throw new Error("OFX inválido: " + file.name + ". Nada foi importado.");
+        const entries = parseOfx(raw);
+        const blockCount = (raw.match(/<STMTTRN\b/gi) || []).length;
+        if (!entries.length || entries.length !== blockCount) throw new Error("Movimentações inválidas ou incompletas em " + file.name + ". Nada foi importado.");
+        for (const entry of entries) {
+          const date = entry.date.slice(6, 10) + "-" + entry.date.slice(3, 5) + "-" + entry.date.slice(0, 2);
+          const amountCents = Math.round(Math.abs(entry.amount) * 100);
+          const type = entry.amount >= 0 ? "income" : "expense";
+          const idKey = entry.fitid ? account.id + "|" + entry.fitid : "";
+          const detailKey = keyFor(date, type, amountCents, entry.description, account.id);
+          if (idKey && knownIds.has(idKey)) { ignored++; continue; }
+          if (knownDetails.has(detailKey)) { reviewed++; continue; }
+          if (!entry.fitid) { reviewed++; continue; }
+          const category = categories.find((item) => item.type === type && item.name === "Outros") || categories.find((item) => item.type === type);
+          staged.push({
+            id: 0, date, type, accountId: account.id, amountCents,
+            description: entry.description, group: category?.name || "Outros",
+            subcategory: category?.subcategories[0]?.name || "Outros",
+            categoryId: category?.id, subcategoryId: category?.subcategories[0]?.id,
+            source: "ofx", externalId: entry.fitid, importHash: file.id + ":" + entry.fitid,
+          });
+          knownIds.add(idKey);
+          knownDetails.add(detailKey);
+        }
+      }
+      if (staged.length) {
+        const firstId = Math.max(Date.now(), ...transactions.map((item) => item.id + 1));
+        onImport(staged.map((item, index) => ({ ...item, id: firstId + index })));
+      }
+      setSyncSummary(staged.length + " movimentações importadas · " + ignored + " já importadas · " + reviewed + " separadas para revisão (não importadas).");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Falha na sincronização. Nada foi importado.");
+    } finally {
+      setSyncProgress("");
+      setSyncing(false);
+    }
+  }
+
   const previewAccount = preview ? accounts.find((account) =>
     preview.folderPath.split(" / ").pop()?.toLocaleUpperCase("pt-BR") === account.name.toLocaleUpperCase("pt-BR")
   ) : undefined;
@@ -320,6 +405,7 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
       </div>
       {connected && <div className="mt-4"><button type="button" disabled={checking} onClick={() => void checkFolders()} className="rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white disabled:opacity-50">{checking ? "Procurando pastas..." : "Localizar pastas no Drive"}</button><p className="mt-2 text-xs text-[#77879B]">Consulta apenas nomes e identificadores de pastas. Não lê nem importa arquivos financeiros.</p></div>}
       {results?.some((item) => item.status === "found") && <div className="mt-4"><button type="button" disabled={checking || loadingFiles} onClick={() => void checkFiles()} className="rounded-xl border border-[#DCE5EF] bg-white/80 px-5 py-3 text-sm font-medium text-[#34383F] disabled:opacity-50">{loadingFiles ? "Verificando arquivos..." : "Verificar arquivos"}</button><p className="mt-2 text-xs text-[#77879B]">Exibe somente metadados de OFX e CSV nas pastas encontradas, sem baixar o conteúdo.</p></div>}
+      {files && <div className="mt-4 rounded-2xl border border-[#DCE5EF] bg-white/90 p-4"><h3 className="text-sm font-semibold text-[#26364D]">Sincronização de extratos bancários</h3><p className="mt-1 text-xs text-[#77879B]">Verifica todos os OFX de Caixa, Inter e Nubank, evita importações repetidas e não importa movimentações suspeitas. Faturas CSV não estão incluídas.</p><button type="button" disabled={syncing || loadingFiles || checking || !connected} onClick={() => void syncAllOfx()} className="mt-3 rounded-xl bg-[#34383F] px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{syncing ? "Sincronizando..." : "Sincronizar todos os extratos OFX"}</button>{syncProgress && <p role="status" className="mt-2 text-xs text-[#526F96]">{syncProgress}</p>}{syncSummary && <p role="status" className="mt-2 text-sm text-emerald-700">{syncSummary}</p>}</div>}
       {files && <div className="mt-5 rounded-2xl border border-[#E5EAF0] bg-white/70 p-4"><h3 className="text-sm font-semibold text-[#26364D]">Arquivos encontrados ({files.length})</h3>{files.length === 0 ? <p className="mt-3 text-sm text-[#77879B]">Nenhum arquivo OFX ou CSV encontrado nas pastas correspondentes.</p> : <div className="mt-3 max-h-96 space-y-2 overflow-y-auto">{files.map((file) => <div key={file.id} className="border-t border-[#E5EAF0] pt-2"><div className="flex flex-wrap items-center justify-between gap-2"><p className="break-all text-sm font-medium text-[#26364D]">{file.name}</p>{file.name.toLowerCase().endsWith(".ofx") && <button type="button" disabled={loadingPreview} onClick={() => void previewOfx(file)} className="rounded-lg border border-[#DCE5EF] px-3 py-1 text-xs font-medium text-[#34383F] disabled:opacity-50">{loadingPreview ? "Lendo..." : "Prévia OFX"}</button>}</div><p className="text-xs text-[#77879B]">{folders.find((folder) => folder.path === file.folderPath)?.label} · {file.modifiedTime ? new Date(file.modifiedTime).toLocaleDateString("pt-BR") : "Data indisponível"} · {file.size ? (Number(file.size) / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " KB" : "Tamanho indisponível"}</p></div>)}</div>}</div>}
       {preview && <div className="mt-4 rounded-2xl border border-[#DCE5EF] bg-white/90 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold text-[#26364D]">Prévia: {preview.fileName}</h3><button type="button" onClick={() => (setPreview(null), setSelectedRows([]), setImportNotice(""))} className="text-xs text-[#526F96]">Fechar prévia</button></div><p className="mt-2 text-xs text-[#77879B]">{preview.entries.length} movimentações reconhecidas{preview.skipped > 0 ? " · " + preview.skipped + " ignoradas por dados inválidos" : ""}. Apenas leitura: nenhuma movimentação foi importada.</p><p className="mt-2 text-xs font-medium text-[#526F96]">{previewAccount ? "Conta: " + previewAccount.name + " · " + countStatus("new") + " novas · " + countStatus("possible") + " possíveis duplicidades · " + countStatus("duplicate") + " já importadas" : "Conta não identificada: comparação indisponível."}</p><div className="mt-3 max-h-80 overflow-auto"><table className="w-full min-w-[420px] text-left text-xs"><thead><tr className="border-b border-[#E5EAF0] text-[#64748B]"><th className="py-2">Selecionar</th><th className="py-2">Data</th><th>Descrição</th><th className="text-right">Valor</th><th className="pl-3">Situação</th></tr></thead><tbody>{classified.slice(0, 100).map((entry, index) => <tr key={index} className="border-b border-[#EEF2F6]"><td className="py-2"><input type="checkbox" aria-label={"Selecionar movimentação " + (index + 1)} disabled={!previewAccount || !safeRows[index]} checked={selectedRows.includes(index)} onChange={(event) => setSelectedRows((current) => event.target.checked ? [...current, index] : current.filter((n) => n !== index))} /></td><td className="py-2 whitespace-nowrap">{entry.date}</td><td className="py-2">{entry.description}</td><td className="py-2 text-right whitespace-nowrap">{entry.amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td><td className="py-2 pl-3 whitespace-nowrap">{!previewAccount ? "Não verificado" : entry.status === "duplicate" ? "Já importada" : entry.status === "possible" ? "Possível duplicidade" : "Nova"}</td></tr>)}</tbody></table></div>{preview.entries.length > 100 && <p className="mt-2 text-xs text-[#77879B]">Exibindo as primeiras 100 movimentações.</p>}<div className="mt-3 flex flex-wrap items-center gap-3"><button type="button" disabled={!previewAccount} onClick={() => setSelectedRows(classified.map((_, i) => i).filter((i) => safeRows[i]))} className="rounded-lg border border-[#DCE5EF] px-3 py-2 text-xs disabled:opacity-50">Selecionar novas</button><button type="button" onClick={() => setSelectedRows([])} className="text-xs text-[#526F96]">Limpar seleção</button><button type="button" disabled={selectedRows.length === 0 || !previewAccount} onClick={importSelected} className="rounded-lg bg-[#34383F] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">Importar selecionadas ({selectedRows.length})</button></div><p className="mt-2 text-xs text-[#77879B]">Possíveis duplicidades e movimentações já importadas ficam bloqueadas. A classificação inicial é Outros e pode ser revisada depois.</p>{importNotice && <p role="status" className="mt-2 text-sm text-emerald-700">{importNotice}</p>}</div>}
       {error && <p role="alert" className="mt-3 text-sm text-rose-600">{error}</p>}
