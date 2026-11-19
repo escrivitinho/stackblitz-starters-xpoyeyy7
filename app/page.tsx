@@ -236,6 +236,7 @@ export default function Home() {
   const [paymentMethod, setPaymentMethod] = useState<"debit" | "credit">("debit");
   const [selectedCreditCard, setSelectedCreditCard] = useState<CardEntry["card"]>("Nubank Crédito");
   const [installmentCount, setInstallmentCount] = useState(1);
+  const [invoiceOffset, setInvoiceOffset] = useState<1 | 2>(1);
 
 
 const totalBalanceCents = calculateTotalBalance(
@@ -533,6 +534,7 @@ const newAccount: Account = {
     setPaidFor("");
     setPaymentMethod("debit");
     setInstallmentCount(1);
+    setInvoiceOffset(1);
     setTransactionError("");
   }
 
@@ -589,7 +591,7 @@ if (amountCents <= 0) {
       const category = categories.find((item) => item.type === "expense" && item.name === transactionGroup);
       const created: CardEntry[] = Array.from({ length: installmentCount }, (_, index) => ({
         id: crypto.randomUUID(), card: selectedCreditCard,
-        date: new Date(Date.UTC(year, month + index, 8)).toISOString().slice(0, 10),
+        date: new Date(Date.UTC(year, month + invoiceOffset - 1 + index, selectedCreditCard === "Inter Crédito" ? 7 : 8)).toISOString().slice(0, 10),
         description: transactionDescription.trim() + (installmentCount > 1 ? " - Parcela " + (index + 1) + "/" + installmentCount : ""),
         amountCents: base + (index < remainder ? 1 : 0),
         importKey: "manual-card:" + groupId + ":" + (index + 1),
@@ -1003,7 +1005,18 @@ if (amountCents <= 0) {
                     <div className="mb-5 space-y-2">
                       <label htmlFor="installment-count" className="block text-xs font-medium text-[#64748B]">Parcelas (1 a 48)</label>
                       <input id="installment-count" type="number" min={1} max={48} value={installmentCount} onChange={(e) => setInstallmentCount(Number(e.target.value))} className="w-full max-w-48 rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm" />
-                      <p className="text-xs text-[#77879B]">Datas provisórias: primeiro vencimento dia 8 do mês seguinte; não use para compras reais até configurarmos o ciclo do cartão.</p>
+                      <span className="block text-xs font-medium text-[#64748B]">Primeira fatura</span>
+                      <div className="flex flex-wrap justify-center gap-3">
+                        {([1, 2] as const).map((offset) => {
+                          const [year, month] = transactionDate.split("-").map(Number);
+                          const valid = Number.isInteger(year) && Number.isInteger(month) && month >= 1 && month <= 12;
+                          const invoiceDate = valid ? new Date(Date.UTC(year, month + offset - 1, 1)) : null;
+                          const label = invoiceDate ? invoiceDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" }) : offset === 1 ? "Próxima fatura" : "Fatura posterior";
+                          return <button key={offset} type="button" aria-pressed={invoiceOffset === offset} onClick={() => setInvoiceOffset(offset)}
+                            className={`min-h-12 w-44 rounded-2xl border px-4 py-3 text-center text-sm font-semibold backdrop-blur-xl transition ${invoiceOffset === offset ? "border-sky-400/80 bg-sky-200/75 text-sky-950 shadow-md" : "border-white/80 bg-white/60 text-[#64748B] hover:bg-white/85"}`}>{label}{invoiceOffset === offset ? " ✓" : ""}</button>;
+                        })}
+                      </div>
+                      <p className="text-xs text-[#77879B]">Sugestão: fatura do mês seguinte à compra. Se o banco adiar a cobrança, escolha a fatura posterior. As parcelas seguintes acompanham a escolha. Vencimento: dia {selectedCreditCard === "Inter Crédito" ? "07" : "08"}. Confira sempre com a fatura oficial.</p>
                     </div>
                   )}
 
