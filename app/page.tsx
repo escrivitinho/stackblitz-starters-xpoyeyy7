@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import CategoriesManager, { type Category } from "./categories-manager";
 import CardsManager, { type CardEntry } from "./cards-manager";
+import DriveSettings from "./drive-settings";
 import { formatCents, parseMoneyToCents } from "./lib/money";
 import {
   calculateTransactionTotals,
@@ -1508,6 +1509,8 @@ if (amountCents <= 0) {
             {backupError && <p role="alert" className="mt-4 text-sm text-rose-600">{backupError}</p>}
           </div>
         )}
+
+        {active === "Configurações" && <DriveSettings />}
 
         {!["Visão geral", "Contas", "Lançamentos", "Categorias", "Configurações"].includes(active) && (
           <div className="flex min-h-[420px] flex-col items-center justify-center rounded-3xl border border-white/90 bg-white/55 p-8 text-center shadow-sm backdrop-blur-2xl">
