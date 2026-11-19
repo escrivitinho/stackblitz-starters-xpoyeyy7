@@ -357,6 +357,22 @@ const accountsWithBalance = accounts.filter(
     }
   }
 
+  function possibleMatches(item: Transaction): Array<{ transaction: Transaction; location: string }> {
+    if (item.type === "transfer") return [];
+    const normalize = (value: string) => value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/\\s+/g, " ").trim();
+    const matches = (candidate: Transaction) =>
+      candidate.type !== "transfer" &&
+      candidate.accountId === item.accountId &&
+      candidate.date === item.date &&
+      candidate.type === item.type &&
+      candidate.amountCents === item.amountCents &&
+      normalize(candidate.description) === normalize(item.description);
+    const confirmed = transactions.filter(matches).map((transaction) => ({ transaction, location: "Já registrado em Lançamentos" }));
+    const otherPending = pendingTransactions.filter((candidate) => candidate.id !== item.id && matches(candidate))
+      .map((transaction) => ({ transaction, location: "Outra pendência" }));
+    return [...confirmed, ...otherPending];
+  }
+
   function goToPage(page: string) {
     setActive(page);
     setSelectedAccountId(null);
@@ -1068,14 +1084,49 @@ if (amountCents <= 0) {
             </div>
             {transactionTab === "pending" && <div className="rounded-3xl border border-white/90 bg-white/65 p-5 shadow-sm md:p-6">
               <h3 className="font-semibold text-[#26364D]">Pendentes verificação</h3>
-              <p className="mt-1 text-xs text-[#64748B]">Movimentações suspeitas não afetam saldos ou relatórios até serem aprovadas. Confira possíveis duplicidades antes de aprovar.</p>
-              {pendingTransactions.length === 0 ? <p className="mt-5 text-sm text-[#64748B]">Nenhuma movimentação aguardando verificação. As pendências de sincronizações anteriores só aparecerão após uma nova leitura dos extratos.</p> :
-                <div className="mt-4 space-y-2">{pendingTransactions.map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-[#EDF0F4] py-3">
-                  <div><p className="text-sm font-medium text-[#35445A]">{item.description}</p><p className="text-xs text-[#64748B]">{displayDate(item.date)} · {accounts.find((a) => a.id === (item.type === "transfer" ? item.fromAccountId : item.accountId))?.name || "Conta não encontrada"} · {item.externalId ? "Possível duplicidade" : "Identificador ausente"}</p></div>
-                  <div className="flex items-center gap-2"><span className="text-sm font-semibold">{item.type === "expense" ? "−" : "+"}{money(item.amountCents)}</span>
-                    <button type="button" className="rounded-lg bg-[#34383F] px-3 py-2 text-xs text-white" onClick={() => { if (!window.confirm("Confirmou que esta movimentação não está duplicada? Ela passará a afetar seus saldos.")) return; setTransactions((current) => [...current, { ...item, id: Math.max(Date.now(), ...current.map((t) => t.id + 1)) }]); setPendingTransactions((current) => current.filter((t) => t.id !== item.id)); }}>Aprovar</button>
-                    <button type="button" className="rounded-lg border border-[#DCE5EF] px-3 py-2 text-xs" onClick={() => { if (window.confirm("Descartar esta pendência?")) setPendingTransactions((current) => current.filter((t) => t.id !== item.id)); }}>Descartar</button>
-                  </div></div>)}</div>}
+              <p className="mt-1 text-xs text-[#64748B]">Compare o lançamento recebido com os registros semelhantes. Nenhuma pendência altera saldos ou relatórios antes da aprovação.</p>
+              {pendingTransactions.length === 0 ? <p className="mt-5 text-sm text-[#64748B]">Nenhuma movimentação aguardando verificação.</p> :
+                <div className="mt-4 space-y-5">{pendingTransactions.map((item) => {
+                  const matches = possibleMatches(item);
+                  const accountName = item.type === "transfer" ? "Transferência" : accounts.find((a) => a.id === item.accountId)?.name || "Conta não encontrada";
+                  return <div key={item.id} className="rounded-2xl border border-[#DCE5EF] bg-white/75 p-4">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-[#26364D]">Conferência de movimentação</p>
+                      <span className="text-xs text-[#64748B]">{matches.length} registro(s) semelhante(s)</span>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3">
+                        <p className="mb-2 text-xs font-semibold text-amber-900">Pendente — recebido do extrato</p>
+                        <p className="break-words text-sm font-medium text-[#35445A]">{item.description}</p>
+                        <p className="mt-2 text-xs text-[#64748B]">Data: {displayDate(item.date)}</p>
+                        <p className="text-xs text-[#64748B]">Banco: {accountName}</p>
+                        <p className="text-xs text-[#64748B]">Tipo: {item.type === "income" ? "Receita" : item.type === "expense" ? "Despesa" : "Transferência"}</p>
+                        <p className="mt-2 text-sm font-semibold">{item.type === "expense" ? "−" : "+"}{money(item.amountCents)}</p>
+                      </div>
+                      <div className="rounded-xl border border-[#DCE5EF] bg-[#F7F9FC] p-3">
+                        <p className="mb-2 text-xs font-semibold text-[#526B8B]">Possível duplicidade — comparação</p>
+                        {matches.length ? <div className="space-y-3">{matches.map(({ transaction: candidate, location }) => <div key={location + candidate.id} className="border-b border-[#DCE5EF] pb-3 last:border-0 last:pb-0">
+                          <p className="text-[11px] font-semibold text-[#526B8B]">{location}</p>
+                          <p className="mt-1 break-words text-sm font-medium text-[#35445A]">{candidate.description}</p>
+                          <p className="mt-2 text-xs text-[#64748B]">Data: {displayDate(candidate.date)}</p>
+                          <p className="text-xs text-[#64748B]">Banco: {accounts.find((a) => a.id === (candidate.type === "transfer" ? candidate.fromAccountId : candidate.accountId))?.name || "Conta não encontrada"}</p>
+                          <p className="text-xs text-[#64748B]">Tipo: {candidate.type === "income" ? "Receita" : candidate.type === "expense" ? "Despesa" : "Transferência"}</p>
+                          <p className="mt-2 text-sm font-semibold">{candidate.type === "expense" ? "−" : "+"}{money(candidate.amountCents)}</p>
+                        </div>)}</div> : <p className="text-xs leading-5 text-[#64748B]">Nenhum registro correspondente foi encontrado entre os lançamentos atuais ou outras pendências. A suspeita pode ter sido identificada durante a leitura dos extratos, ou o registro original pode ter sido alterado.</p>}
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap justify-end gap-2">
+                      <button type="button" className="rounded-lg bg-[#34383F] px-4 py-2 text-xs font-semibold text-white" onClick={() => {
+                        if (!window.confirm("Você verificou os registros semelhantes e confirma que esta movimentação é nova? Aprovar adicionará um lançamento e afetará seus saldos.")) return;
+                        setTransactions((current) => [...current, { ...item, id: Math.max(Date.now(), ...current.map((t) => t.id + 1)) }]);
+                        setPendingTransactions((current) => current.filter((t) => t.id !== item.id));
+                      }}>Aprovar lançamento</button>
+                      <button type="button" className="rounded-lg border border-[#DCE5EF] px-4 py-2 text-xs font-semibold" onClick={() => {
+                        if (window.confirm("Descartar somente esta pendência? Nenhum lançamento confirmado será excluído.")) setPendingTransactions((current) => current.filter((t) => t.id !== item.id));
+                      }}>Descartar pendência</button>
+                    </div>
+                  </div>;
+                })}</div>}
             </div>}
             {transactionTab === "all" && <>
             {/* LISTA */}
