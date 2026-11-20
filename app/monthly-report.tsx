@@ -27,7 +27,16 @@ export default function MonthlyReport({transactions,categories}:{transactions:Tr
    const categoryName=category?.name||t.group;
    const subcategory=category?.subcategories.find(sub=>sub.id===t.subcategoryId)?.name||t.subcategory;
    const isExpense=t.type!=="transfer"&&(expenseNames.has(normalize(categoryName))||category?.type==="expense");
-   const isTransfer=t.type==="transfer"||category?.type==="transfer"||normalize(categoryName)==="transferencia"||normalize(categoryName)==="transferencias";
+   const normalizedGroup=normalize(t.group||"");
+   const normalizedCategory=normalize(categoryName);
+   const normalizedSubcategory=normalize(subcategory||"");
+   // A importação OFX pode marcar como receita uma transferência entre contas.
+   // Respeitar a categoria/subcategoria original mesmo quando a categoria foi
+   // associada a um tipo "income" na migração.
+   const isTransfer=t.type==="transfer"||category?.type==="transfer"||
+    /transferenc|transferencias|transfer entre contas|entre contas|faturas/.test(normalizedGroup)||
+    /transferenc|transferencias|transfer entre contas|entre contas|faturas/.test(normalizedCategory)||
+    /transferenc|transferencias|transfer entre contas|entre contas|faturas/.test(normalizedSubcategory);
    const isInvestmentMovement=normalize(categoryName)==="investimentos"&&/^(aplicacao|resgate)\b/.test(normalize(subcategory||""));
    const type=isTransfer||isInvestmentMovement?"transfer":isExpense?"expense":category?.type==="income"?"income":t.type;
    const direction=t.type==="income"?1:t.type==="expense"?-1:0;
