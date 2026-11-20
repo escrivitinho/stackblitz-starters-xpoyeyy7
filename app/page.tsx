@@ -196,6 +196,24 @@ export default function Home() {
   const [categories, setCategories] = useState<Category[]>(mergeExcelCategories(initialCategories));
   const [descriptionRules,setDescriptionRules]=useState<DescriptionRule[]>([]);
   const [categoryScreen,setCategoryScreen]=useState<"categories"|"rules">("categories");
+  function deleteCategoryWithTransfer(sourceCategoryId:string,sourceSubcategoryId:string|null,targetCategoryId:string,targetSubcategoryId:string){
+    const target=categories.find(c=>c.id===targetCategoryId);
+    const sub=target?.subcategories.find(x=>x.id===targetSubcategoryId);
+    const source=categories.find(c=>c.id===sourceCategoryId);
+    if(!target||!sub||!source||target.type!==source.type)return;
+    setTransactions(current=>current.map(t=>{
+      const matches=sourceSubcategoryId
+        ?t.subcategoryId===sourceSubcategoryId
+        :t.categoryId===sourceCategoryId||source.subcategories.some(x=>x.id===t.subcategoryId);
+      return matches?{...t,categoryId:target.id,subcategoryId:sub.id,group:target.name,subcategory:sub.name}:t;
+    }));
+    setDescriptionRules(current=>current.map(rule=>{
+      const matches=sourceSubcategoryId?rule.subcategoryId===sourceSubcategoryId:rule.categoryId===sourceCategoryId;
+      return matches?{...rule,categoryId:target.id,subcategoryId:sub.id}:rule;
+    }));
+    setCategories(current=>sourceSubcategoryId?current.map(c=>c.id===sourceCategoryId?{...c,subcategories:c.subcategories.filter(x=>x.id!==sourceSubcategoryId)}:c):current.filter(c=>c.id!==sourceCategoryId));
+  }
+
   const [cardEntries, setCardEntries] = useState<CardEntry[]>([]);
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
   const [transactionTab, setTransactionTab] = useState<"all" | "pending" | "transfers">("all");
@@ -1794,7 +1812,7 @@ if (amountCents <= 0) {
               <button type="button" onClick={()=>setCategoryScreen("categories")} className={`rounded-xl px-5 py-3 text-sm font-semibold ${categoryScreen==="categories"?"bg-white/90 text-[#263D59] shadow-sm":"bg-white/40 text-[#64748B]"}`}>Categorias e subcategorias</button>
               <button type="button" onClick={()=>setCategoryScreen("rules")} className={`rounded-xl px-5 py-3 text-sm font-semibold ${categoryScreen==="rules"?"bg-white/90 text-[#263D59] shadow-sm":"bg-white/40 text-[#64748B]"}`}>Classificação por descrição</button>
             </div>
-            {categoryScreen==="categories"?<CategoriesManager categories={categories} onChange={setCategories} usedCategoryIds={transactions.map(t=>t.categoryId).filter((id):id is string=>Boolean(id))} usedSubcategoryIds={transactions.map(t=>t.subcategoryId).filter((id):id is string=>Boolean(id))}/>:<DescriptionRules rules={descriptionRules} onChange={setDescriptionRules} categories={categories}/>}
+            {categoryScreen==="categories"?<CategoriesManager onDeleteWithTransfer={deleteCategoryWithTransfer} categories={categories} onChange={setCategories} usedCategoryIds={transactions.map(t=>t.categoryId).filter((id):id is string=>Boolean(id))} usedSubcategoryIds={transactions.map(t=>t.subcategoryId).filter((id):id is string=>Boolean(id))}/>:<DescriptionRules rules={descriptionRules} onChange={setDescriptionRules} categories={categories}/>}
           </div>
         )}
 
