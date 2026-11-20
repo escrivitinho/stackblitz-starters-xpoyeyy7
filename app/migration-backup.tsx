@@ -16,7 +16,7 @@ export default function MigrationBackup({ token }: { token: string }) {
    const payload: unknown=JSON.parse(raw);
    if(!payload || typeof payload!=="object" || Array.isArray(payload)) throw new Error("Backup local inválido.");
    const data=payload as Record<string,unknown>;
-   const counts=Object.fromEntries(collections.map(name=>[name,Array.isArray(data[name])?data[name].length:0]));
+   const counts: Record<string, number> = Object.fromEntries(collections.map(name => { const value = data[name]; return [name, Array.isArray(value) ? value.length : 0]; }));
    return {payload:data,counts};
  }
  function download() {
