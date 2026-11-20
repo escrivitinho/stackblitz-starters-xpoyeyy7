@@ -7,6 +7,13 @@ export function matchDescriptionRule(description:string,rules:DescriptionRule[],
  const text=normalizeRuleText(description);
  return [...rules].filter(r=>r.term.trim()&&text.includes(normalizeRuleText(r.term))&&categories.some(c=>c.id===r.categoryId&&c.subcategories.some(s=>s.id===r.subcategoryId))).sort((a,b)=>b.term.length-a.term.length)[0];
 }
+export function classifyCardByDescription<T extends {description:string;amountCents:number;kind?:"purchase"|"credit"|"payment";categoryId?:string;subcategoryId?:string}>(entry:T,rules:DescriptionRule[],categories:Category[]):T{
+ if(entry.amountCents<=0 || (entry.kind && entry.kind!=="purchase"))return entry;
+ const rule=matchDescriptionRule(entry.description,rules,categories);
+ const category=categories.find(c=>c.id===rule?.categoryId && c.type==="expense");
+ if(!category || !category.subcategories.some(sub=>sub.id===rule?.subcategoryId))return entry;
+ return {...entry,categoryId:rule!.categoryId,subcategoryId:rule!.subcategoryId};
+}
 type BulkRow={line:number;term:string;category:string;subcategory:string;categoryId?:string;subcategoryId?:string;issue?:string};
 function parseBulk(text:string):Array<{line:number;term:string;category:string;subcategory:string}> {
  return text.split(/\r?\n/).flatMap((raw,index)=>{
