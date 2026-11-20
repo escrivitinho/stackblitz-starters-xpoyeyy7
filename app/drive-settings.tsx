@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Category } from "./categories-manager";
 import type { Transaction } from "./transactions";
+import { parseNubankCsv, type CardEntry } from "./cards-manager";
 
 const CLIENT_ID = "268082285521-ibocgv8kmj8rsgvthd8svjlvp6cg8knm.apps.googleusercontent.com";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
@@ -81,7 +82,7 @@ function parseOfx(raw: string): OfxEntry[] {
   return entries;
 }
 
-export default function DriveSettings({ transactions, accounts, categories, onImport, onPending, onCardCsv }: { transactions: Transaction[]; accounts: Array<{ id: number; name: string }>; categories: Category[]; onImport: (items: Transaction[]) => void; onPending: (items: Transaction[]) => void; onCardCsv: (file: File) => void }) {
+export default function DriveSettings({ transactions, accounts, categories, onImport, onPending, onCardCsv, cardEntries, onCardImport }: { transactions: Transaction[]; accounts: Array<{ id: number; name: string }>; categories: Category[]; onImport: (items: Transaction[]) => void; onPending: (items: Transaction[]) => void; onCardCsv: (file: File) => void; cardEntries: CardEntry[]; onCardImport: (items: CardEntry[]) => void }) {
   const [sdkReady, setSdkReady] = useState(false);
   const [connected, setConnected] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -170,6 +171,7 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
     const discovered = await checkFiles(located, token);
     if (!discovered) { setSyncProgress(""); return; }
     await syncAllOfx(located, discovered, token);
+    await syncCardInvoices(discovered, token);
   }
 
   async function checkFolders(authorizedToken?: string): Promise<FolderResult[] | null> {
@@ -278,6 +280,35 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
       onCardCsv(new File([blob],file.name,{type:"text/csv"}));
     }catch(e){setError(e instanceof Error?e.message:"Erro ao carregar fatura.");}
     finally{setLoadingPreview(false);}
+  }
+
+  async function syncCardInvoices(discovered: FileResult[], token: string) {
+    const invoices=discovered.filter(file=>file.name.toLowerCase().endsWith(".csv") && file.folderPath.includes(" / FATURAS"));
+    const known=new Set(cardEntries.map(entry=>entry.importKey));
+    const additions:CardEntry[]=[];
+    let duplicates=0;
+    const skipped:string[]=[];
+    for(let i=0;i<invoices.length;i++){
+      const file=invoices[i];
+      setSyncProgress("Lendo fatura "+(i+1)+" de "+invoices.length+": "+file.name);
+      if(!/^nubank[_ -]/i.test(file.name)){skipped.push(file.name+" (cartão não reconhecido)");continue;}
+      try{
+        if(file.size && Number(file.size)>3*1024*1024)throw new Error("Arquivo acima de 3 MB");
+        const response=await fetch("https://www.googleapis.com/drive/v3/files/"+encodeURIComponent(file.id)+"?alt=media",{headers:{Authorization:"Bearer "+token},cache:"no-store"});
+        if(!response.ok)throw new Error("HTTP "+response.status);
+        const raw=await response.text();
+        if(raw.length>3*1024*1024)throw new Error("Arquivo acima de 3 MB");
+        for(const item of parseNubankCsv(raw)){
+          if(known.has(item.importKey)){duplicates++;continue;}
+          known.add(item.importKey);
+          additions.push({...item,id:crypto.randomUUID()});
+        }
+      }catch(e){skipped.push(file.name+" ("+(e instanceof Error?e.message:"erro de leitura")+")");}
+    }
+    if(additions.length)onCardImport(additions);
+    setSyncSummary(previous=>previous+" Faturas: "+additions.length+" movimentações novas · "+duplicates+" já importadas · "+skipped.length+" arquivos não processados.");
+    if(skipped.length)setSyncSkippedFiles(previous=>[...previous,...skipped]);
+    setSyncProgress("");
   }
 
   async function previewOfx(file: FileResult) {
