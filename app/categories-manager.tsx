@@ -16,6 +16,7 @@ type Props = {
   onChange: (categories: Category[]) => void;
   usedCategoryIds: string[];
   usedSubcategoryIds: string[];
+  onDeleteWithTransfer: (sourceCategoryId:string,sourceSubcategoryId:string|null,targetCategoryId:string,targetSubcategoryId:string)=>void;
 };
 
 const typeLabels: Record<CategoryType, string> = {
@@ -57,7 +58,7 @@ const typeStyles: Record<CategoryType, string> = {
   transfer: "bg-blue-50 text-blue-700",
 };
 
-export default function CategoriesManager({ categories, onChange, usedCategoryIds, usedSubcategoryIds }: Props) {
+export default function CategoriesManager({ categories, onChange, usedCategoryIds, usedSubcategoryIds, onDeleteWithTransfer }: Props) {
   const [name, setName] = useState("");
   const [type, setType] = useState<CategoryType>("expense");
   const [subcategoryDrafts, setSubcategoryDrafts] = useState<Record<string, string>>({});
@@ -66,6 +67,9 @@ export default function CategoriesManager({ categories, onChange, usedCategoryId
   const [editingSubcategory, setEditingSubcategory] = useState<{ categoryId: string; subcategoryId: string } | null>(null);
   const [editingSubcategoryName, setEditingSubcategoryName] = useState("");
   const [error, setError] = useState("");
+  const [moving,setMoving]=useState<{categoryId:string;subcategoryId:string|null}|null>(null);
+  const [targetCategoryId,setTargetCategoryId]=useState("");
+  const [targetSubcategoryId,setTargetSubcategoryId]=useState("");
 
   function resetForm() {
     setName("");
@@ -134,13 +138,10 @@ export default function CategoriesManager({ categories, onChange, usedCategoryId
   }
 
   function removeCategory(category: Category) {
-    if (usedCategoryIds.includes(category.id) || category.subcategories.some((sub) => usedSubcategoryIds.includes(sub.id))) {
-      setError("Esta categoria possui lançamentos vinculados e não pode ser excluída.");
-      return;
-    }
-    if (!confirm(`Excluir a categoria "${category.name}" e suas subcategorias?`)) return;
-    onChange(categories.filter((item) => item.id !== category.id));
-    if (editingCategoryId === category.id) setEditingCategoryId(null);
+    const hasLinks=usedCategoryIds.includes(category.id)||category.subcategories.some(sub=>usedSubcategoryIds.includes(sub.id));
+    if(hasLinks){setMoving({categoryId:category.id,subcategoryId:null});setTargetCategoryId("");setTargetSubcategoryId("");setError("");return;}
+    if(!confirm(`Excluir a categoria "${category.name}" e suas subcategorias?`))return;
+    onChange(categories.filter(item=>item.id!==category.id));
   }
 
   function addSubcategory(categoryId: string) {
@@ -199,23 +200,34 @@ export default function CategoriesManager({ categories, onChange, usedCategoryId
     setError("");
   }
 
-  function removeSubcategory(categoryId: string, subcategoryId: string) {
-    if (usedSubcategoryIds.includes(subcategoryId)) {
-      setError("Esta subcategoria possui lançamentos vinculados e não pode ser excluída.");
-      return;
-    }
-    onChange(categories.map((category) =>
-      category.id === categoryId
-        ? { ...category, subcategories: category.subcategories.filter((item) => item.id !== subcategoryId) }
-        : category
-    ));
-    if (editingSubcategory?.categoryId === categoryId && editingSubcategory.subcategoryId === subcategoryId) {
-      setEditingSubcategory(null);
-    }
+  function removeSubcategory(categoryId:string,subcategoryId:string){
+    if(usedSubcategoryIds.includes(subcategoryId)){setMoving({categoryId,subcategoryId});setTargetCategoryId("");setTargetSubcategoryId("");setError("");return;}
+    if(!confirm("Excluir esta subcategoria?"))return;
+    onChange(categories.map(c=>c.id===categoryId?{...c,subcategories:c.subcategories.filter(sub=>sub.id!==subcategoryId)}:c));
+  }
+
+  const sourceCategory=categories.find(c=>c.id===moving?.categoryId);
+  const availableTargets=categories.filter(c=>c.type===sourceCategory?.type&&(!moving||moving.subcategoryId!==null||c.id!==moving.categoryId));
+  const selectedTarget=categories.find(c=>c.id===targetCategoryId);
+  function confirmTransfer(){
+    if(!moving||!targetCategoryId||!targetSubcategoryId){setError("Escolha a categoria e a subcategoria de destino.");return;}
+    if(moving.categoryId===targetCategoryId&&moving.subcategoryId===targetSubcategoryId){setError("Selecione um destino diferente.");return;}
+    onDeleteWithTransfer(moving.categoryId,moving.subcategoryId,targetCategoryId,targetSubcategoryId);
+    setMoving(null);setError("");
   }
 
   return (
     <div className="moneo-categories space-y-6">
+      {moving&&<div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-sm">
+        <div role="dialog" aria-modal="true" className="w-full max-w-lg space-y-4 rounded-3xl border border-white/80 bg-white p-6 shadow-2xl">
+          <h3 className="text-lg font-semibold text-[#263D59]">Transferir lançamentos antes de excluir</h3>
+          <p className="text-sm text-[#64748B]">Para excluir <strong>{moving.subcategoryId?sourceCategory?.subcategories.find(x=>x.id===moving.subcategoryId)?.name:sourceCategory?.name}</strong>, escolha para onde transferir os lançamentos vinculados. Os valores e as datas serão preservados.</p>
+          <label className="block space-y-1 text-sm">Categoria de destino<select value={targetCategoryId} onChange={e=>{setTargetCategoryId(e.target.value);setTargetSubcategoryId("");}} className="w-full rounded-xl border p-3"><option value="">Selecione</option>{availableTargets.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+          <label className="block space-y-1 text-sm">Subcategoria de destino<select value={targetSubcategoryId} onChange={e=>setTargetSubcategoryId(e.target.value)} className="w-full rounded-xl border p-3"><option value="">Selecione</option>{selectedTarget?.subcategories.filter(sub=>!(moving.categoryId===targetCategoryId&&moving.subcategoryId===sub.id)).map(sub=><option key={sub.id} value={sub.id}>{sub.name}</option>)}</select></label>
+          {error&&<p className="text-sm text-rose-700">{error}</p>}
+          <div className="flex justify-end gap-3"><button type="button" onClick={()=>{setMoving(null);setError("");}} className="rounded-xl border px-4 py-2">Cancelar</button><button type="button" onClick={confirmTransfer} className="rounded-xl bg-[#344D70] px-4 py-2 font-semibold text-white">Transferir e excluir</button></div>
+        </div>
+      </div>}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {(["income", "expense", "transfer"] as CategoryType[]).map((item) => (
           <div key={item} className={`rounded-3xl border bg-white/65 p-5 shadow-sm backdrop-blur-2xl ${typeAccents[item].border}`}>
