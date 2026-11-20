@@ -6,6 +6,7 @@ import CategoriesManager, { type Category } from "./categories-manager";
 import CardsManager, { type CardEntry } from "./cards-manager";
 import DriveSettings from "./drive-settings";
 import InvestmentsManager from "./investments-manager";
+import MonthlyReport from "./monthly-report";
 import ClassificationPreview, { excelRules } from "./classification-preview";
 import ExcelReclassification from "./excel-reclassification";
 import { formatCents, parseMoneyToCents } from "./lib/money";
@@ -1775,6 +1776,8 @@ if (amountCents <= 0) {
             usedSubcategoryIds={transactions.map((transaction) => transaction.subcategoryId).filter((id): id is string => Boolean(id))}
           />
         )}
+
+        {active === "Relatórios" && <MonthlyReport transactions={transactions} />}
 
         {active === "Configurações" && <ExcelReclassification transactions={transactions} categories={categories} onApply={(items, cats) => { setCategories(cats); setTransactions(items); }} />}
         {active === "Configurações" && <ClassificationPreview transactions={transactions} categories={categories} onApply={(ids, categoryId, subcategoryId) => setTransactions(current => current.map(t => ids.includes(t.id) && t.type !== "transfer" && !t.internalTransferPairId && !t.categoryId && !t.subcategoryId ? { ...t, categoryId, subcategoryId, group: categories.find(c => c.id === categoryId)?.name ?? t.group, subcategory: categories.find(c => c.id === categoryId)?.subcategories.find(sub => sub.id === subcategoryId)?.name ?? t.subcategory } : t))} />}
