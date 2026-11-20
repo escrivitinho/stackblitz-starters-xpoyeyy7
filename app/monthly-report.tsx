@@ -104,7 +104,7 @@ export default function MonthlyReport({transactions,categories}:{transactions:Tr
       const key=section.type+"-"+row.name;const expanded=!collapsedCategories.includes(key);
       const categoryFill=section.type==="income"?"rgba(143,207,155,0.82)":"rgba(240,148,157,0.82)";
       const subcategoryFill=section.type==="income"?"rgba(220,243,222,0.78)":"rgba(252,221,226,0.78)";
-      const totalFill=section.type==="income"?"bg-[#A9DBB5]/85":"bg-[#F0ABB4]/85";
+      const totalFill=section.type==="income"?"rgba(114,194,133,0.82)":"rgba(231,109,126,0.82)";
       return <><tr key={key} className={`border-b-2 border-white/75 font-semibold ${section.type==="income"?"text-[#1B5E20]":"text-[#B71C1C]"}`}>
        <td className="sticky left-0 py-2 pr-4" style={{backgroundColor:categoryFill}}><button type="button" className="text-left hover:text-blue-700" onClick={()=>setCollapsedCategories(current=>expanded?[...current,key]:current.filter(k=>k!==key))}>{expanded?"▾":"▸"} {row.name}</button></td>
        {row.months.map((v,i)=><td key={i} className="px-2 py-2 text-right" style={{backgroundColor:categoryFill}}>{v?money(v):"—"}</td>)}<td className="px-2 py-2 text-right" style={{backgroundColor:categoryFill}}>{money(totalFor(row.months))}</td><td className="px-2 py-2 text-right" style={{backgroundColor:categoryFill}}>{money(Math.round(totalFor(row.months)/monthsWithEntries))}</td>
