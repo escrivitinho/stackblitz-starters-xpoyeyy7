@@ -278,7 +278,7 @@ export default function Home() {
             : initialCategories);
           setCategories(loadedCategories);
           if (Array.isArray(stored.transactions)) {
-            setTransactions(migrateTransactions(stored.transactions as Transaction[], loadedCategories));
+            setTransactions(migrateTransactions(stored.transactions as Transaction[], loadedCategories).map(item => classifyExcelTransaction(item, loadedCategories)));
           }
         }
       }
