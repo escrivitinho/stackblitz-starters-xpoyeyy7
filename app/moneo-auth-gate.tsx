@@ -32,7 +32,18 @@ export default function MoneoAuthGate({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email: email.trim(), password }),
       });
       const data = await response.json();
-      if (!response.ok || !data.access_token) throw new Error("E-mail ou senha inválidos.");
+      if (!response.ok || !data.access_token) {
+        const code = typeof data.code === "string" ? data.code : "";
+        const message = typeof data.msg === "string" ? data.msg : typeof data.error_description === "string" ? data.error_description : typeof data.message === "string" ? data.message : "";
+        if (code === "invalid_credentials" || /invalid login credentials/i.test(message)) {
+          throw new Error("O Supabase recusou as credenciais. Confira o e-mail e a senha cadastrados em Authentication → Users. Se necessário, redefina a senha desse usuário no Supabase.");
+        }
+        if (code === "email_not_confirmed" || /email not confirmed/i.test(message)) {
+          throw new Error("O e-mail do usuário ainda não foi confirmado no Supabase. Confirme-o em Authentication → Users.");
+        }
+        if (response.status === 429) throw new Error("Muitas tentativas de login. Aguarde alguns minutos antes de tentar novamente.");
+        throw new Error("Falha de autenticação no Supabase (" + response.status + (code ? ", " + code : "") + "). Confira a URL, a chave pública e o estado do serviço.");
+      }
       // O usuário precisa estar explicitamente cadastrado em moneo_owner.
       const ownerResponse = await fetch(url + "/rest/v1/rpc/is_moneo_owner", {
         method: "POST",
@@ -43,13 +54,16 @@ export default function MoneoAuthGate({ children }: { children: ReactNode }) {
         },
         body: "{}",
       });
-      if (!ownerResponse.ok || (await ownerResponse.json()) !== true) {
-        throw new Error("Esta conta não está autorizada a acessar o MONEO.");
+      if (!ownerResponse.ok) {
+        throw new Error("Login aceito, mas não foi possível consultar a autorização de proprietário (HTTP " + ownerResponse.status + "). Verifique as permissões da função is_moneo_owner.");
+      }
+      if ((await ownerResponse.json()) !== true) {
+        throw new Error("Login aceito, mas esta conta não está autorizada na tabela moneo_owner.");
       }
       setPassword("");
       setState("authorized");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Não foi possível autenticar.");
+      setError(cause instanceof TypeError ? "Não foi possível conectar ao Supabase. Confira a URL do projeto e a conexão de rede." : cause instanceof Error ? cause.message : "Não foi possível autenticar.");
     } finally {
       setBusy(false);
     }
