@@ -7,6 +7,8 @@ const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 const AuthTokenContext = createContext("");
 export function useMoneoToken() { return useContext(AuthTokenContext); }
+const SignOutContext = createContext<() => void>(() => {});
+export function useMoneoSignOut() { return useContext(SignOutContext); }
 
 type Session = { access_token: string; refresh_token: string; expires_at: number };
 const sessionKey = "moneo-auth-session-v1";
@@ -168,7 +170,7 @@ export default function MoneoAuthGate({ children }: { children: ReactNode }) {
     window.location.assign(destination.toString());
   }
 
-  if (state === "authorized") return <AuthTokenContext.Provider value={accessToken}><div className="fixed right-3 top-3 z-[100]"><button type="button" onClick={() => void signOut()} className="rounded-xl border border-[#DCE4EF] bg-white/95 px-4 py-2 text-xs font-semibold text-[#263D59] shadow-md hover:bg-[#F5F8FC]">Sair</button></div>{children}</AuthTokenContext.Provider>;
+  if (state === "authorized") return <AuthTokenContext.Provider value={accessToken}><SignOutContext.Provider value={() => void signOut()}>{children}</SignOutContext.Provider></AuthTokenContext.Provider>;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#EDF3FA] via-[#F8FAFD] to-[#E7EFF9] px-5 py-10 text-[#263D59]">
