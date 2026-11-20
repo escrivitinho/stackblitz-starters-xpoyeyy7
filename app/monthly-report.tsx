@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import type { Transaction } from "./transactions";
 import type { Category } from "./categories-manager";
+import { excelRules } from "./classification-preview";
 import { formatCents } from "./lib/money";
 
 const monthNames=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -11,21 +12,28 @@ export default function MonthlyReport({transactions,categories}:{transactions:Tr
  const [selectedYear,setSelectedYear]=useState<number|null>(null);
  const [reportTab,setReportTab]=useState<"charts"|"analytic"|"monthly">("charts");
  const year=selectedYear!==null&&years.includes(selectedYear)?selectedYear:(years[0]??new Date().getFullYear());
- const classified=useMemo(()=>transactions.map(t=>{
-  // Reembolsos são entradas bancárias, mas pertencem à categoria de despesa.
-  // Priorizar o ID e depois a combinação categoria/subcategoria evita que
-  // categorias de receita homônimas capturem indevidamente um reembolso.
+ const classified=useMemo(()=>{
   const normalize=(value:string)=>value.trim().normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLocaleLowerCase("pt-BR");
-  const byId=categories.find(c=>c.id===t.categoryId);
-  const sameName=categories.filter(c=>normalize(c.name)===normalize(t.group||""));
-  const bySubcategory=sameName.find(c=>c.type==="expense"&&c.subcategories.some(sub=>sub.id===t.subcategoryId||normalize(sub.name)===normalize(t.subcategory||"")));
-  const category=byId || bySubcategory || (t.type==="income"?sameName.find(c=>c.type==="expense"):undefined) || sameName.find(c=>c.type===t.type);
-  const type=category?.type==="expense"||category?.type==="income"?category.type:t.type;
-  const direction=t.type==="income"?1:t.type==="expense"?-1:0;
-  const signedAmount=type==="income"?direction*t.amountCents:-direction*t.amountCents;
-  const subcategory=category?.subcategories.find(sub=>sub.id===t.subcategoryId)?.name || t.subcategory;
-  return {transaction:t,type,signedAmount,group:category?.name||t.group,subcategory};
- }),[transactions,categories]);
+  // A planilha é a fonte da natureza das categorias: algumas entradas OFX
+  // foram importadas como "income" apesar de serem estornos de despesas.
+  const expenseNames=new Set(excelRules.filter(rule=>rule[3]==="expense").map(rule=>normalize(rule[1])));
+  return transactions.map(t=>{
+   const byId=categories.find(c=>c.id===t.categoryId);
+   const groupName=normalize(t.group||"");
+   const sameName=categories.filter(c=>normalize(c.name)===groupName);
+   const expenseCategory=sameName.find(c=>c.type==="expense");
+   const expenseBySubcategory=categories.find(c=>c.type==="expense"&&c.subcategories.some(sub=>sub.id===t.subcategoryId));
+   const category=expenseBySubcategory || (t.type==="income"&&expenseNames.has(groupName)?expenseCategory:undefined) || byId || expenseCategory || sameName.find(c=>c.type===t.type);
+   const categoryName=category?.name||t.group;
+   const subcategory=category?.subcategories.find(sub=>sub.id===t.subcategoryId)?.name||t.subcategory;
+   const isExpense=t.type!=="transfer"&&(expenseNames.has(normalize(categoryName))||category?.type==="expense");
+   const isInvestmentMovement=normalize(categoryName)==="investimentos"&&/^(aplicacao|resgate)\\b/.test(normalize(subcategory||""));
+   const type=isInvestmentMovement?"transfer":isExpense?"expense":category?.type==="income"?"income":t.type;
+   const direction=t.type==="income"?1:t.type==="expense"?-1:0;
+   const signedAmount=type==="income"?direction*t.amountCents:type==="expense"?-direction*t.amountCents:0;
+   return {transaction:t,type,signedAmount,group:categoryName,subcategory};
+  });
+ },[transactions,categories]);
  const monthly=useMemo(()=>Array.from({length:12},(_,index)=>{
   const prefix=year+"-"+String(index+1).padStart(2,"0");
   const items=classified.filter(({transaction:t})=>t.date.startsWith(prefix)&&!t.internalTransferPairId&&t.type!=="transfer");
