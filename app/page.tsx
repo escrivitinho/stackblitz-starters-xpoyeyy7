@@ -964,7 +964,6 @@ if (amountCents <= 0) {
 
         {active === "Visão geral" && (
           <div className="space-y-5">
-            <TopExpenses transactions={transactions} categories={categories} />
             <div className="flex flex-wrap gap-3">
               {([["income", "+ Nova receita"], ["expense", "+ Nova despesa"]] as [TransactionType, string][]).map(([type, label]) => (
                 <button key={type} type="button" onClick={() => {
@@ -1016,7 +1015,7 @@ if (amountCents <= 0) {
               </div>
             </div>
 
-
+            <TopExpenses transactions={transactions} categories={categories} />
           </div>
         )}
 
