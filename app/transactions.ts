@@ -8,6 +8,7 @@ type TransactionBase = {
   date: string; // AAAA-MM-DD
   amountCents: number; // Sempre positivo
   description: string;
+  displayDescription?: string; // Nome exibido; a descrição original do extrato permanece intacta.
   group: string;
   subcategory: string;
   categoryId?: string;
