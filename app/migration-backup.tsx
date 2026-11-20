@@ -54,7 +54,7 @@ export default function MigrationBackup({ token }: { token: string }) {
      });
      if(!verify.ok)throw new Error("Backup enviado, mas não foi possível conferir a leitura.");
      const stored=await verify.json();
-     if(stored.length!==1||JSON.stringify(stored[0].counts)!==JSON.stringify(data.counts))
+     if(stored.length!==1||collections.some(name=>stored[0].counts?.[name]!==data.counts[name]))
        throw new Error("Backup enviado, mas a conferência das contagens falhou. Não prossiga sem revisar.");
      setMessage("Cópia online criada e contagens conferidas! ID: "+id+". O MONEO ainda usa o armazenamento local.");
    }catch(e){setFailed(true);setMessage(e instanceof Error?e.message:"Erro inesperado na migração.");}
