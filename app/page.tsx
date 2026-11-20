@@ -1737,7 +1737,7 @@ if (amountCents <= 0) {
         {/* OUTROS MÓDULOS */}
         {/* ================================== */}
 
-        {active === "Investimentos" && <InvestmentsManager />}
+        {active === "Investimentos" && <InvestmentsManager accounts={accounts.map(({ id, name }) => ({ id, name }))} />}
 
         {active === "Cartões" && (
           <CardsManager entries={cardEntries} onChange={setCardEntries} categories={categories} />
