@@ -227,6 +227,7 @@ export default function Home() {
       /transfer[eê]ncia|\bpix\b|ted|doc/i.test(item.description)
     ).length === 1);
 
+  const [transactionColumnFilters, setTransactionColumnFilters] = useState({ date: "", description: "", category: "", amount: "" });
   const [transactionSort, setTransactionSort] = useState<"date" | "description" | "category" | "amount">("date");
   const [transactionSortDirection, setTransactionSortDirection] = useState<"asc" | "desc">("desc");
   function changeTransactionSort(column: "date" | "description" | "category" | "amount") {
@@ -235,7 +236,11 @@ export default function Home() {
   }
   const filteredTransactions = transactions.filter((item) =>
     (transactionTypeFilter === "all" || (transactionTypeFilter === "uncategorized" ? (!item.categoryId || !item.subcategoryId || normalizedExcelText(item.group) === "outros" || normalizedExcelText(item.subcategory) === "outros") : item.type === transactionTypeFilter)) &&
-    (!transactionMonthFilter || item.date.startsWith(transactionMonthFilter))
+    (!transactionMonthFilter || item.date.startsWith(transactionMonthFilter)) &&
+    (!transactionColumnFilters.date || displayDate(item.date).toLocaleLowerCase("pt-BR").includes(transactionColumnFilters.date.toLocaleLowerCase("pt-BR")) || item.date.includes(transactionColumnFilters.date)) &&
+    (!transactionColumnFilters.description || normalizedExcelText(item.displayDescription || item.description).includes(normalizedExcelText(transactionColumnFilters.description))) &&
+    (!transactionColumnFilters.category || normalizedExcelText([categories.find(c => c.id === item.categoryId)?.name || item.group, categories.find(c => c.id === item.categoryId)?.subcategories.find(sub => sub.id === item.subcategoryId)?.name || item.subcategory].join(" ")).includes(normalizedExcelText(transactionColumnFilters.category))) &&
+    (!transactionColumnFilters.amount || money(item.amountCents).replace(/[^\\d,]/g, "").includes(transactionColumnFilters.amount.replace(/[^\\d,]/g, "")))
   ).sort((a, b) => {
     const direction = transactionSortDirection === "asc" ? 1 : -1;
     if (transactionSort === "amount") return (a.amountCents - b.amountCents || a.id - b.id) * direction;
@@ -1417,8 +1422,17 @@ if (amountCents <= 0) {
                 </div>
               ) : (
                 <div className="space-y-1">
-                  <div className="hidden grid-cols-[100px_minmax(180px,2fr)_minmax(140px,1.4fr)_120px_60px] gap-3 border-b border-[#E2E8F0] pb-3 text-xs font-semibold uppercase tracking-wide text-[#8190A4] md:grid">
-                    {(["date", "description", "category", "amount"] as const).map((column) => <button key={column} type="button" onClick={() => changeTransactionSort(column)} aria-label={`Ordenar por ${column}`} aria-pressed={transactionSort === column} className={`flex items-center gap-1 text-left hover:text-[#334B75] ${column === "amount" ? "justify-end" : ""}`}>{({date:"Data",description:"Descrição",category:"Categoria / Subcategoria",amount:"Valor"} as const)[column]} <span aria-hidden="true">{transactionSort === column ? (transactionSortDirection === "asc" ? "↑" : "↓") : "↕"}</span></button>)}<span />
+                  <div className="grid grid-cols-2 gap-3 border-b border-[#E2E8F0] pb-3 md:grid-cols-[100px_minmax(180px,2fr)_minmax(140px,1.4fr)_120px_60px]">
+                    {(["date", "description", "category", "amount"] as const).map((column) => (
+                      <div key={column} className="min-w-0 space-y-2">
+                        <button type="button" onClick={() => changeTransactionSort(column)} aria-label={`Ordenar por ${column}`} aria-pressed={transactionSort === column} className={`flex w-full items-center gap-1 text-left text-xs font-semibold uppercase tracking-wide text-[#8190A4] hover:text-[#334B75] ${column === "amount" ? "md:justify-end" : ""}`}>
+                          {({date:"Data",description:"Descrição",category:"Categoria / Subcategoria",amount:"Valor"} as const)[column]}
+                          <span aria-hidden="true">{transactionSort === column ? (transactionSortDirection === "asc" ? "↑" : "↓") : "↕"}</span>
+                        </button>
+                        <input type="text" value={transactionColumnFilters[column]} onChange={event => setTransactionColumnFilters(current => ({ ...current, [column]: event.target.value }))} placeholder={column === "date" ? "dd/mm/aaaa" : column === "amount" ? "Ex.: 25,90" : "Filtrar..."} aria-label={`Filtrar ${column}`} className="w-full min-w-0 rounded-lg border border-[#DDE5EF] bg-white/80 px-2 py-2 text-xs font-normal text-[#35445A] outline-none focus:border-blue-400" />
+                      </div>
+                    ))}
+                    <div className="hidden md:block" />
                   </div>
                   {filteredTransactions.map((transaction) => (
                     <div key={transaction.id} className="grid grid-cols-[80px_minmax(0,1fr)_auto] items-center gap-3 border-b border-[#EDF0F4] py-4 last:border-0 md:grid-cols-[100px_minmax(180px,2fr)_minmax(140px,1.4fr)_120px_60px]">
