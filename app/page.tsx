@@ -232,6 +232,27 @@ function Home() {
     setCategories(current=>sourceSubcategoryId?current.map(c=>c.id===sourceCategoryId?{...c,subcategories:c.subcategories.filter(x=>x.id!==sourceSubcategoryId)}:c):current.filter(c=>c.id!==sourceCategoryId));
   }
 
+  function reclassifyByDescriptionRules(){
+    const candidates=transactions.filter(t=>t.type!=="transfer"&&!t.internalTransferPairId&&t.source!=="manual");
+    const updates=candidates.map(t=>{
+      const rule=matchDescriptionRule(t.description,descriptionRules,categories);
+      const category=categories.find(c=>c.id===rule?.categoryId);
+      const subcategory=category?.subcategories.find(x=>x.id===rule?.subcategoryId);
+      // Preserve the transaction type and its account linkage.
+      if(!category||!subcategory||category.type!==t.type)return null;
+      if(t.categoryId===category.id&&t.subcategoryId===subcategory.id)return null;
+      return {id:t.id,categoryId:category.id,subcategoryId:subcategory.id,group:category.name,subcategory:subcategory.name};
+    }).filter((x):x is NonNullable<typeof x>=>x!==null);
+    if(!updates.length){window.alert("Nenhum lançamento importado precisa de reclassificação pelas regras atuais.");return;}
+    if(!window.confirm("Reclassificar "+updates.length+" lançamentos importados com as regras atuais? As categorias anteriores desses lançamentos serão substituídas. Valores, contas e transferências internas serão preservados."))return;
+    const byId=new Map(updates.map(x=>[x.id,x]));
+    setTransactions(current=>current.map(t=>{
+      const update=byId.get(t.id);
+      return update?{...t,...update}:t;
+    }));
+    window.alert(updates.length+" lançamentos reclassificados. Aguarde a confirmação de salvamento no Supabase.");
+  }
+
   const [cardEntries, setCardEntries] = useState<CardEntry[]>([]);
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
   const [transactionTab, setTransactionTab] = useState<"all" | "pending" | "transfers">("all");
@@ -1876,7 +1897,7 @@ if (amountCents <= 0) {
               <button type="button" onClick={()=>setCategoryScreen("categories")} className={`rounded-xl px-5 py-3 text-sm font-semibold ${categoryScreen==="categories"?"bg-white/90 text-[#263D59] shadow-sm":"bg-white/40 text-[#64748B]"}`}>Categorias e subcategorias</button>
               <button type="button" onClick={()=>setCategoryScreen("rules")} className={`rounded-xl px-5 py-3 text-sm font-semibold ${categoryScreen==="rules"?"bg-white/90 text-[#263D59] shadow-sm":"bg-white/40 text-[#64748B]"}`}>Classificação por descrição</button>
             </div>
-            {categoryScreen==="categories"?<CategoriesManager onDeleteWithTransfer={deleteCategoryWithTransfer} categories={categories} onChange={setCategories} usedCategoryIds={transactions.map(t=>t.categoryId).filter((id):id is string=>Boolean(id))} usedSubcategoryIds={transactions.map(t=>t.subcategoryId).filter((id):id is string=>Boolean(id))}/>:<DescriptionRules rules={descriptionRules} onChange={setDescriptionRules} categories={categories}/>}
+            {categoryScreen==="categories"?<CategoriesManager onDeleteWithTransfer={deleteCategoryWithTransfer} categories={categories} onChange={setCategories} usedCategoryIds={transactions.map(t=>t.categoryId).filter((id):id is string=>Boolean(id))} usedSubcategoryIds={transactions.map(t=>t.subcategoryId).filter((id):id is string=>Boolean(id))}/>:<DescriptionRules rules={descriptionRules} onChange={setDescriptionRules} categories={categories} onReclassify={reclassifyByDescriptionRules}/>}
           </div>
         )}
 
