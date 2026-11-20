@@ -142,6 +142,7 @@ export default function CardsManager({ entries, onChange, categories, descriptio
     setManualSuccess(manualInstallments === 1 ? "Compra registrada." : manualInstallments + " parcelas registradas.");
     setManualDescription(""); setManualAmount(""); setManualInstallments(1);
   }
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [cardFilter, setCardFilter] = useState("Todos");
   const [monthFilter, setMonthFilter] = useState("Todos");
   const expenseCategories = categories.filter((category) => category.type === "expense");
@@ -320,15 +321,10 @@ export default function CardsManager({ entries, onChange, categories, descriptio
       </>}
       {entries.length > 0 && <section className="rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm backdrop-blur-2xl">
         <h3 className="text-lg font-semibold text-[#26364D]">Movimentações dos cartões</h3>
-        <p className="mt-2 text-sm text-[#77879B]">Classifique cada registro. Ao reconhecer uma descrição já classificada, o MONEO sugere a mesma categoria para você aprovar. Pagamentos e estornos não recebem sugestões. As alterações são salvas neste navegador.</p>
+        <p className="mt-2 text-sm text-[#77879B]">Consulte as movimentações e suas classificações. Clique em um lançamento para editar tipo, categoria e subcategoria. Pagamentos e estornos não recebem sugestões. As alterações são salvas automaticamente.</p>
         <div className="mt-5 flex flex-wrap gap-3">
           <label className="text-xs text-[#64748B]">Cartão<select aria-label="Filtrar cartão" className="mt-1 block rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-sm" value={cardFilter} onChange={(e) => setCardFilter(e.target.value)}><option>Todos</option><option>Nubank Crédito</option><option>Inter Crédito</option></select></label>
           <label className="text-xs text-[#64748B]">Mês<select aria-label="Filtrar mês" className="mt-1 block rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-sm" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}><option>Todos</option>{months.map((month) => <option key={month} value={month}>{month.slice(5)}/{month.slice(0, 4)}</option>)}</select></label>
-        </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl bg-white/70 p-4"><p className="text-xs text-[#77879B]">Compras</p><p className="mt-2 font-semibold text-[#B65D58]">{formatCents(filtered.filter((entry) => (entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase")) === "purchase").reduce((sum, entry) => sum + Math.abs(entry.amountCents), 0))}</p></div>
-          <div className="rounded-2xl bg-white/70 p-4"><p className="text-xs text-[#77879B]">Créditos / estornos</p><p className="mt-2 font-semibold text-emerald-700">{formatCents(filtered.filter((entry) => (entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase")) === "credit").reduce((sum, entry) => sum + Math.abs(entry.amountCents), 0))}</p></div>
-          <div className="rounded-2xl bg-white/70 p-4"><p className="text-xs text-[#77879B]">Pagamentos identificados</p><p className="mt-2 font-semibold text-[#26364D]">{formatCents(filtered.filter((entry) => entry.kind === "payment").reduce((sum, entry) => sum + Math.abs(entry.amountCents), 0))}</p></div>
         </div>
         <div className="mt-5 space-y-3">
           {filtered.map((entry) => {
@@ -337,20 +333,28 @@ export default function CardsManager({ entries, onChange, categories, descriptio
             const suggestion = kind === "purchase" ? findSuggestion(entry, entries, categories) : null;
             const suggestedCategory = suggestion ? expenseCategories.find((item) => item.id === suggestion.categoryId) : undefined;
             const suggestedSubcategory = suggestedCategory?.subcategories.find((item) => item.id === suggestion?.subcategoryId);
-            return <div key={entry.id} className="rounded-2xl border border-[#E5EAF0] bg-white/75 p-4">
-              <div className="flex flex-wrap justify-between gap-3">
-                <div className="min-w-0"><p className="font-medium text-[#26364D]">{entry.description}</p><p className="mt-1 text-xs text-[#77879B]">{entry.date.split("-").reverse().join("/")} · {entry.card}</p></div>
-                <p className={`font-semibold ${entry.amountCents < 0 ? "text-emerald-700" : "text-[#B65D58]"}`}>{entry.amountCents < 0 ? "−" : ""}{formatCents(Math.abs(entry.amountCents))}</p>
-              </div>
-              {suggestion && suggestedCategory && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-200/80 bg-sky-50/80 px-3 py-2">
-                <p className="text-xs text-[#395D7A]">Sugestão baseada em compras classificadas com a mesma descrição: <strong>{suggestedCategory.name}{suggestedSubcategory ? " → " + suggestedSubcategory.name : ""}</strong></p>
-                <button type="button" onClick={() => updateEntry(entry.id, { categoryId: suggestion.categoryId, subcategoryId: suggestion.subcategoryId })} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-[#294263] shadow-sm ring-1 ring-sky-200 hover:bg-sky-100">Aplicar sugestão</button>
-              </div>}
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <label className="text-xs text-[#64748B]">Tipo<select aria-label={"Tipo: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm" value={kind} onChange={(e) => updateEntry(entry.id, { kind: e.target.value as CardEntry["kind"], categoryId: undefined, subcategoryId: undefined })}><option value="purchase">Compra</option><option value="credit">Crédito / estorno</option><option value="payment">Pagamento da fatura</option></select></label>
-                <label className="text-xs text-[#64748B]">Categoria<select disabled={kind !== "purchase"} aria-label={"Categoria: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm disabled:opacity-40" value={entry.categoryId ?? ""} onChange={(e) => updateEntry(entry.id, { categoryId: e.target.value || undefined, subcategoryId: undefined })}><option value="">Não classificada</option>{expenseCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-                <label className="text-xs text-[#64748B]">Subcategoria<select disabled={kind !== "purchase" || !category} aria-label={"Subcategoria: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm disabled:opacity-40" value={entry.subcategoryId ?? ""} onChange={(e) => updateEntry(entry.id, { subcategoryId: e.target.value || undefined })}><option value="">Não selecionada</option>{category?.subcategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-              </div>
+            const editing = editingEntryId === entry.id;
+            const subcategory = category?.subcategories.find((item) => item.id === entry.subcategoryId);
+            return <div key={entry.id} className={`rounded-2xl border bg-white/75 p-4 transition-colors ${editing ? "border-[#A7BBD6] shadow-sm" : "border-[#E5EAF0] hover:border-[#CAD6E6]"}`}>
+              <button type="button" aria-expanded={editing} aria-label={(editing ? "Fechar edição de " : "Editar ") + entry.description} onClick={() => setEditingEntryId(editing ? null : entry.id)} className="w-full text-left">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0"><p className="font-medium text-[#26364D]">{entry.description}</p><p className="mt-1 text-xs text-[#77879B]">{entry.date.split("-").reverse().join("/")} · {entry.card}</p></div>
+                  <div className="flex items-center gap-3"><p className={`font-semibold ${entry.amountCents < 0 ? "text-emerald-700" : "text-[#B65D58]"}`}>{entry.amountCents < 0 ? "−" : ""}{formatCents(Math.abs(entry.amountCents))}</p><span aria-hidden="true" className="text-[#7A8BA4]">{editing ? "⌃" : "⌄"}</span></div>
+                </div>
+                <p className="mt-2 text-xs text-[#64748B]">{kind === "purchase" ? "Compra" : kind === "credit" ? "Crédito / estorno" : "Pagamento da fatura"}{kind === "purchase" ? " · " + (category?.name ?? "Não classificada") + (subcategory ? " → " + subcategory.name : "") : ""}</p>
+              </button>
+              {editing && <>
+                {suggestion && suggestedCategory && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-200/80 bg-sky-50/80 px-3 py-2">
+                  <p className="text-xs text-[#395D7A]">Sugestão baseada em compras classificadas com a mesma descrição: <strong>{suggestedCategory.name}{suggestedSubcategory ? " → " + suggestedSubcategory.name : ""}</strong></p>
+                  <button type="button" onClick={() => updateEntry(entry.id, { categoryId: suggestion.categoryId, subcategoryId: suggestion.subcategoryId })} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-[#294263] shadow-sm ring-1 ring-sky-200 hover:bg-sky-100">Aplicar sugestão</button>
+                </div>}
+                <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                  <label className="text-xs text-[#64748B]">Tipo<select aria-label={"Tipo: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm" value={kind} onChange={(e) => updateEntry(entry.id, { kind: e.target.value as CardEntry["kind"], categoryId: undefined, subcategoryId: undefined })}><option value="purchase">Compra</option><option value="credit">Crédito / estorno</option><option value="payment">Pagamento da fatura</option></select></label>
+                  <label className="text-xs text-[#64748B]">Categoria<select disabled={kind !== "purchase"} aria-label={"Categoria: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm disabled:opacity-40" value={entry.categoryId ?? ""} onChange={(e) => updateEntry(entry.id, { categoryId: e.target.value || undefined, subcategoryId: undefined })}><option value="">Não classificada</option>{expenseCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                  <label className="text-xs text-[#64748B]">Subcategoria<select disabled={kind !== "purchase" || !category} aria-label={"Subcategoria: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm disabled:opacity-40" value={entry.subcategoryId ?? ""} onChange={(e) => updateEntry(entry.id, { subcategoryId: e.target.value || undefined })}><option value="">Não selecionada</option>{category?.subcategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                </div>
+                <div className="mt-3 flex justify-end"><button type="button" onClick={() => setEditingEntryId(null)} className="rounded-lg px-3 py-2 text-xs font-semibold text-[#526B8B] hover:bg-[#EDF2F8]">Concluir edição</button></div>
+              </>}
             </div>;
           })}
           {filtered.length === 0 && <p className="py-5 text-sm text-[#77879B]">Nenhuma movimentação neste filtro.</p>}
