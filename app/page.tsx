@@ -9,7 +9,7 @@ import CardsManager, { type CardEntry } from "./cards-manager";
 import DriveSettings from "./drive-settings";
 import InvestmentsManager from "./investments-manager";
 import MonthlyReport from "./monthly-report";
-import DescriptionRules, {matchDescriptionRule, type DescriptionRule} from "./description-rules";
+import DescriptionRules, {matchDescriptionRule, classifyCardByDescription, type DescriptionRule} from "./description-rules";
 import TopExpenses from "./top-expenses";
 import { excelRules } from "./classification-preview";
 import { formatCents, parseMoneyToCents } from "./lib/money";
@@ -243,14 +243,22 @@ function Home() {
       if(t.categoryId===category.id&&t.subcategoryId===subcategory.id)return null;
       return {id:t.id,categoryId:category.id,subcategoryId:subcategory.id,group:category.name,subcategory:subcategory.name};
     }).filter((x):x is NonNullable<typeof x>=>x!==null);
-    if(!updates.length){window.alert("Nenhum lançamento importado precisa de reclassificação pelas regras atuais.");return;}
-    if(!window.confirm("Reclassificar "+updates.length+" lançamentos importados com as regras atuais? As categorias anteriores desses lançamentos serão substituídas. Valores, contas e transferências internas serão preservados."))return;
+    const cardUpdates=cardEntries.map(entry=>{
+      const classified=classifyCardByDescription(entry,descriptionRules,categories);
+      return classified.categoryId!==entry.categoryId || classified.subcategoryId!==entry.subcategoryId ? classified : null;
+    }).filter((entry):entry is CardEntry=>entry!==null);
+    if(!updates.length && !cardUpdates.length){window.alert("Nenhum lançamento ou compra de cartão precisa de reclassificação pelas regras atuais.");return;}
+    if(!window.confirm("Reclassificar "+updates.length+" lançamentos bancários e "+cardUpdates.length+" compras de cartão com as regras atuais? As categorias anteriores serão substituídas quando houver regra válida. Valores, contas e transferências serão preservados."))return;
     const byId=new Map(updates.map(x=>[x.id,x]));
-    setTransactions(current=>current.map(t=>{
+    if(updates.length)setTransactions(current=>current.map(t=>{
       const update=byId.get(t.id);
       return update?{...t,...update}:t;
     }));
-    window.alert(updates.length+" lançamentos reclassificados. Aguarde a confirmação de salvamento no Supabase.");
+    if(cardUpdates.length){
+      const cardById=new Map(cardUpdates.map(entry=>[entry.id,entry]));
+      setCardEntries(current=>current.map(entry=>cardById.get(entry.id)??entry));
+    }
+    window.alert(updates.length+" lançamentos bancários e "+cardUpdates.length+" compras de cartão reclassificados. Aguarde a confirmação de salvamento no Supabase.");
   }
 
   const [cardEntries, setCardEntries] = useState<CardEntry[]>([]);
@@ -1898,8 +1906,8 @@ if (amountCents <= 0) {
             <p className="mt-2 text-sm text-[#64748B]">Gerencie extratos bancários e faturas de cartão em um único lugar. Google Drive é a fonte principal; o envio manual é uma alternativa.</p>
           </div>
         </div>}
-        {active === "Central de Importações" && <DriveSettings transactions={transactions} accounts={accounts} categories={categories} onImport={(items) => setTransactions((current) => [...current, ...items.map(item => classifyExcelTransaction(item, categories))])} onCardCsv={setDriveCardFile} cardEntries={cardEntries} onCardImport={(items)=>setCardEntries(current=>[...current,...items.filter(item=>!current.some(entry=>entry.importKey===item.importKey))])} onPending={(items) => setPendingTransactions((current) => { const known = new Set(current.map((t) => t.importHash)); return [...current, ...items.filter((item) => !known.has(item.importHash))]; })} />}
-        {active === "Central de Importações" && <CardsManager entries={cardEntries} onChange={setCardEntries} categories={categories} importOnly driveFile={driveCardFile} />}
+        {active === "Central de Importações" && <DriveSettings transactions={transactions} accounts={accounts} categories={categories} onImport={(items) => setTransactions((current) => [...current, ...items.map(item => classifyExcelTransaction(item, categories))])} onCardCsv={setDriveCardFile} cardEntries={cardEntries} onCardImport={(items)=>setCardEntries(current=>[...current,...items.filter(item=>!current.some(entry=>entry.importKey===item.importKey)).map(item=>classifyCardByDescription(item,descriptionRules,categories))])} onPending={(items) => setPendingTransactions((current) => { const known = new Set(current.map((t) => t.importHash)); return [...current, ...items.filter((item) => !known.has(item.importHash))]; })} />}
+        {active === "Central de Importações" && <CardsManager entries={cardEntries} onChange={setCardEntries} categories={categories} descriptionRules={descriptionRules} importOnly driveFile={driveCardFile} />}
         {active === "Categorias" && (
           <div className="space-y-5">
             <div className="flex flex-wrap gap-2">
