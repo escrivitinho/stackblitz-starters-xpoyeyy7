@@ -1,7 +1,7 @@
 
 "use client";
 
-import MoneoAuthGate, { useMoneoToken } from "./moneo-auth-gate";
+import MoneoAuthGate, { useMoneoToken, useMoneoSignOut } from "./moneo-auth-gate";
 
 import { useEffect, useRef, useState } from "react";
 import CategoriesManager, { type Category } from "./categories-manager";
@@ -191,6 +191,7 @@ function displayDate(date: string) {
 
 function Home() {
   const cloudToken = useMoneoToken();
+  const signOut = useMoneoSignOut();
   const [cloudError, setCloudError] = useState("");
   const [cloudStatus, setCloudStatus] = useState("Conectando ao banco online…");
   const cloudRevision = useRef<number | null>(null);
@@ -1021,6 +1022,7 @@ if (amountCents <= 0) {
               <p className="text-xs text-slate-400">Conta pessoal</p>
             </div>
           </div>
+          <button type="button" onClick={signOut} className="mt-3 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-[#65748A] transition hover:bg-[#E8EDF5] hover:text-[#263D59]">↪ Sair da conta</button>
         </div>
       </aside>
 
