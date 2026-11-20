@@ -125,6 +125,7 @@ const navigation = [
   { name: "Categorias", icon: "⌁" },
   { name: "Contas", icon: "▤" },
   { name: "Cartões", icon: "▣" },
+  { name: "Central de Importações", icon: "⇩" },
   { name: "Investimentos", icon: "◈" },
   { name: "Orçamento", icon: "◷" },
 ];
@@ -1890,6 +1891,14 @@ if (amountCents <= 0) {
           <CardsManager entries={cardEntries} onChange={setCardEntries} categories={categories} />
         )}
 
+        {active === "Central de Importações" && <div className="space-y-5">
+          <div className="rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-[#263D59]">Central de Importações</h2>
+            <p className="mt-2 text-sm text-[#64748B]">Gerencie extratos bancários e faturas de cartão em um único lugar. Google Drive é a fonte principal; o envio manual é uma alternativa.</p>
+          </div>
+        </div>}
+        {active === "Central de Importações" && <DriveSettings transactions={transactions} accounts={accounts} categories={categories} onImport={(items) => setTransactions((current) => [...current, ...items.map(item => classifyExcelTransaction(item, categories))])} onPending={(items) => setPendingTransactions((current) => { const known = new Set(current.map((t) => t.importHash)); return [...current, ...items.filter((item) => !known.has(item.importHash))]; })} />}
+        {active === "Central de Importações" && <CardsManager entries={cardEntries} onChange={setCardEntries} categories={categories} importOnly />}
         {active === "Categorias" && (
           <div className="space-y-5">
             <div className="flex flex-wrap gap-2">
@@ -1927,9 +1936,8 @@ if (amountCents <= 0) {
           </div>
         )}
 
-        {active === "Configurações" && <DriveSettings transactions={transactions} accounts={accounts} categories={categories} onImport={(items) => setTransactions((current) => [...current, ...items.map(item => classifyExcelTransaction(item, categories))])} onPending={(items) => setPendingTransactions((current) => { const known = new Set(current.map((t) => t.importHash)); return [...current, ...items.filter((item) => !known.has(item.importHash))]; })} />}
 
-        {!["Visão geral", "Contas", "Lançamentos", "Categorias", "Configurações"].includes(active) && (
+        {!["Visão geral", "Contas", "Lançamentos", "Categorias", "Configurações", "Central de Importações"].includes(active) && (
           <div className="flex min-h-[420px] flex-col items-center justify-center rounded-3xl border border-white/90 bg-white/55 p-8 text-center shadow-sm backdrop-blur-2xl">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7EEF7] text-3xl text-[#526F96]">✧</div>
             <h3 className="mt-5 text-xl font-semibold text-[#263D59]">{active}</h3>
