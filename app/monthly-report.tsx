@@ -13,7 +13,7 @@ export default function MonthlyReport({transactions,categories}:{transactions:Tr
  const [reportTab,setReportTab]=useState<"charts"|"analytic"|"monthly">("charts");
  const year=selectedYear!==null&&years.includes(selectedYear)?selectedYear:(years[0]??new Date().getFullYear());
  const classified=useMemo(()=>{
-  const normalize=(value:string)=>value.trim().normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLocaleLowerCase("pt-BR");
+  const normalize=(value:string)=>value.trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase("pt-BR");
   // A planilha é a fonte da natureza das categorias: algumas entradas OFX
   // foram importadas como "income" apesar de serem estornos de despesas.
   const expenseNames=new Set(excelRules.filter(rule=>rule[3]==="expense").map(rule=>normalize(rule[1])));
@@ -27,8 +27,9 @@ export default function MonthlyReport({transactions,categories}:{transactions:Tr
    const categoryName=category?.name||t.group;
    const subcategory=category?.subcategories.find(sub=>sub.id===t.subcategoryId)?.name||t.subcategory;
    const isExpense=t.type!=="transfer"&&(expenseNames.has(normalize(categoryName))||category?.type==="expense");
-   const isInvestmentMovement=normalize(categoryName)==="investimentos"&&/^(aplicacao|resgate)\\b/.test(normalize(subcategory||""));
-   const type=isInvestmentMovement?"transfer":isExpense?"expense":category?.type==="income"?"income":t.type;
+   const isTransfer=t.type==="transfer"||category?.type==="transfer"||normalize(categoryName)==="transferencia"||normalize(categoryName)==="transferencias";
+   const isInvestmentMovement=normalize(categoryName)==="investimentos"&&/^(aplicacao|resgate)\b/.test(normalize(subcategory||""));
+   const type=isTransfer||isInvestmentMovement?"transfer":isExpense?"expense":category?.type==="income"?"income":t.type;
    const direction=t.type==="income"?1:t.type==="expense"?-1:0;
    const signedAmount=type==="income"?direction*t.amountCents:type==="expense"?-direction*t.amountCents:0;
    return {transaction:t,type,signedAmount,group:categoryName,subcategory};
@@ -36,13 +37,13 @@ export default function MonthlyReport({transactions,categories}:{transactions:Tr
  },[transactions,categories]);
  const monthly=useMemo(()=>Array.from({length:12},(_,index)=>{
   const prefix=year+"-"+String(index+1).padStart(2,"0");
-  const items=classified.filter(({transaction:t})=>t.date.startsWith(prefix)&&!t.internalTransferPairId&&t.type!=="transfer");
+  const items=classified.filter(({transaction:t,type})=>t.date.startsWith(prefix)&&!t.internalTransferPairId&&t.type!=="transfer"&&type!=="transfer");
   const income=items.filter(t=>t.type==="income").reduce((sum,t)=>sum+t.signedAmount,0);
   const expense=items.filter(t=>t.type==="expense").reduce((sum,t)=>sum+t.signedAmount,0);
   return {month:monthNames[index],income,expense,balance:income-expense,count:items.length};
  }),[classified,year]);
  const categoryRows=useMemo(()=>{
-  const data=classified.filter(({transaction:t})=>t.date.startsWith(String(year)+"-")&&!t.internalTransferPairId&&t.type!=="transfer");
+  const data=classified.filter(({transaction:t,type})=>t.date.startsWith(String(year)+"-")&&!t.internalTransferPairId&&t.type!=="transfer"&&type!=="transfer");
   return (["income","expense"] as const).map(type=>{
    const rows=new Map<string,{name:string;months:number[];subs:Map<string,number[]>}>();
    for(const t of data.filter(x=>x.type===type)){
