@@ -7,6 +7,7 @@ import CardsManager, { type CardEntry } from "./cards-manager";
 import DriveSettings from "./drive-settings";
 import InvestmentsManager from "./investments-manager";
 import MonthlyReport from "./monthly-report";
+import TopExpenses from "./top-expenses";
 import ClassificationPreview, { excelRules } from "./classification-preview";
 import ExcelReclassification from "./excel-reclassification";
 import { formatCents, parseMoneyToCents } from "./lib/money";
@@ -963,6 +964,7 @@ if (amountCents <= 0) {
 
         {active === "Visão geral" && (
           <div className="space-y-5">
+            <TopExpenses transactions={transactions} categories={categories} />
             <div className="flex flex-wrap gap-3">
               {([["income", "+ Nova receita"], ["expense", "+ Nova despesa"]] as [TransactionType, string][]).map(([type, label]) => (
                 <button key={type} type="button" onClick={() => {
