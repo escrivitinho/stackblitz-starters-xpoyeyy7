@@ -1777,7 +1777,7 @@ if (amountCents <= 0) {
           />
         )}
 
-        {active === "Relatórios" && <MonthlyReport transactions={transactions} />}
+        {active === "Relatórios" && <MonthlyReport transactions={transactions} categories={categories} />}
 
         {active === "Configurações" && <ExcelReclassification transactions={transactions} categories={categories} onApply={(items, cats) => { setCategories(cats); setTransactions(items); }} />}
         {active === "Configurações" && <ClassificationPreview transactions={transactions} categories={categories} onApply={(ids, categoryId, subcategoryId) => setTransactions(current => current.map(t => ids.includes(t.id) && t.type !== "transfer" && !t.internalTransferPairId && !t.categoryId && !t.subcategoryId ? { ...t, categoryId, subcategoryId, group: categories.find(c => c.id === categoryId)?.name ?? t.group, subcategory: categories.find(c => c.id === categoryId)?.subcategories.find(sub => sub.id === subcategoryId)?.name ?? t.subcategory } : t))} />}
