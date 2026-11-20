@@ -6,7 +6,7 @@ import CategoriesManager, { type Category } from "./categories-manager";
 import CardsManager, { type CardEntry } from "./cards-manager";
 import DriveSettings from "./drive-settings";
 import InvestmentsManager from "./investments-manager";
-import ClassificationPreview from "./classification-preview";
+import ClassificationPreview, { excelRules } from "./classification-preview";
 import { formatCents, parseMoneyToCents } from "./lib/money";
 import {
   calculateTransactionTotals,
@@ -54,6 +54,34 @@ const initialAccounts: Account[] = [
     source: "pending",
   },
 ];
+
+const normalizedExcelText = (value: string) => value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().trim();
+function mergeExcelCategories(existing: Category[]): Category[] {
+  const merged = existing.map(category => ({ ...category, subcategories: [...category.subcategories] }));
+  for (const [, name, sub, type] of excelRules) {
+    let category = merged.find(item => item.type === type && normalizedExcelText(item.name) === normalizedExcelText(name));
+    if (!category) {
+      category = { id: "excel-category-" + merged.length + "-" + type, name, type, subcategories: [] };
+      merged.push(category);
+    }
+    if (sub && !category.subcategories.some(item => normalizedExcelText(item.name) === normalizedExcelText(sub))) {
+      category.subcategories.push({ id: "excel-sub-" + category.id + "-" + category.subcategories.length, name: sub });
+    }
+  }
+  return merged;
+}
+function classifyExcelTransaction(transaction: Transaction, categories: Category[]): Transaction {
+  if (transaction.type === "transfer" || transaction.internalTransferPairId || transaction.source === "manual") return transaction;
+  const isPlaceholder = !transaction.categoryId || normalizedExcelText(transaction.group) === "outros";
+  if (!isPlaceholder) return transaction;
+  const matches = excelRules.filter(([keyword,, ,type]) => type === transaction.type && normalizedExcelText(transaction.description).includes(normalizedExcelText(keyword)));
+  if (!matches.length || new Set(matches.map(([,category,sub]) => normalizedExcelText(category)+"|"+normalizedExcelText(sub))).size !== 1) return transaction;
+  const [,categoryName,subName] = [...matches].sort((a,b)=>b[0].length-a[0].length)[0];
+  const category = categories.find(item => item.type === transaction.type && normalizedExcelText(item.name) === normalizedExcelText(categoryName));
+  const subcategory = category?.subcategories.find(item => normalizedExcelText(item.name) === normalizedExcelText(subName));
+  if (!category || !subcategory) return transaction;
+  return { ...transaction, categoryId: category.id, subcategoryId: subcategory.id, group: category.name, subcategory: subcategory.name };
+}
 
 function normalizeCategories(value: Category[]): Category[] {
   return value.map((category) => ({
@@ -161,7 +189,7 @@ export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
   const [transactions, setTransactions] =
     useState<Transaction[]>(initialTransactions);
-  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const [categories, setCategories] = useState<Category[]>(mergeExcelCategories(initialCategories));
   const [cardEntries, setCardEntries] = useState<CardEntry[]>([]);
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
   const [transactionTab, setTransactionTab] = useState<"all" | "pending" | "transfers">("all");
@@ -245,9 +273,9 @@ export default function Home() {
           if (Array.isArray(stored.cardEntries)) setCardEntries(stored.cardEntries as CardEntry[]);
           if (Array.isArray(stored.pendingTransactions)) setPendingTransactions(stored.pendingTransactions as Transaction[]);
            if (Array.isArray(stored.rejectedTransferPairs)) setRejectedTransferPairs(stored.rejectedTransferPairs as string[]);
-          const loadedCategories = Array.isArray(stored.categories)
+          const loadedCategories = mergeExcelCategories(Array.isArray(stored.categories)
             ? normalizeCategories(stored.categories as Category[])
-            : initialCategories;
+            : initialCategories);
           setCategories(loadedCategories);
           if (Array.isArray(stored.transactions)) {
             setTransactions(migrateTransactions(stored.transactions as Transaction[], loadedCategories));
@@ -1779,7 +1807,7 @@ if (amountCents <= 0) {
           </div>
         )}
 
-        {active === "Configurações" && <DriveSettings transactions={transactions} accounts={accounts} categories={categories} onImport={(items) => setTransactions((current) => [...current, ...items])} onPending={(items) => setPendingTransactions((current) => { const known = new Set(current.map((t) => t.importHash)); return [...current, ...items.filter((item) => !known.has(item.importHash))]; })} />}
+        {active === "Configurações" && <DriveSettings transactions={transactions} accounts={accounts} categories={categories} onImport={(items) => setTransactions((current) => [...current, ...items.map(item => classifyExcelTransaction(item, categories))])} onPending={(items) => setPendingTransactions((current) => { const known = new Set(current.map((t) => t.importHash)); return [...current, ...items.filter((item) => !known.has(item.importHash))]; })} />}
 
         {!["Visão geral", "Contas", "Lançamentos", "Categorias", "Configurações"].includes(active) && (
           <div className="flex min-h-[420px] flex-col items-center justify-center rounded-3xl border border-white/90 bg-white/55 p-8 text-center shadow-sm backdrop-blur-2xl">
