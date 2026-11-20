@@ -1,12 +1,15 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 const AuthTokenContext = createContext("");
 export function useMoneoToken() { return useContext(AuthTokenContext); }
+
+type Session = { access_token: string; refresh_token: string; expires_at: number };
+const sessionKey = "moneo-auth-session-v1";
 
 type AuthState = "loading" | "signed-out" | "authorized" | "unconfigured";
 
@@ -31,25 +34,127 @@ export default function MoneoAuthGate({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [accessToken, setAccessToken] = useState("");
 
+  const sessionRef = useRef<Session | null>(null);
+  const refreshingRef = useRef<Promise<Session> | null>(null);
+  const [sessionExpiry, setSessionExpiry] = useState(0);
+
+  function acceptSession(session: Session) {
+    sessionRef.current = session;
+    window.localStorage.setItem(sessionKey, JSON.stringify(session));
+    setAccessToken(session.access_token);
+    setSessionExpiry(session.expires_at);
+    setState("authorized");
+    setError("");
+  }
+
+  function clearSession() {
+    sessionRef.current = null;
+    window.localStorage.removeItem(sessionKey);
+    setAccessToken("");
+    setSessionExpiry(0);
+    setState("signed-out");
+  }
+
+  async function refreshSession(current: Session): Promise<Session> {
+    if (refreshingRef.current) return refreshingRef.current;
+    const pending = (async () => {
+      const response = await fetch(url + "/auth/v1/token?grant_type=refresh_token", {
+        method: "POST",
+        headers: { apikey: key!, "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: current.refresh_token }),
+      });
+      if (!response.ok) throw new Error("Sua sessão expirou. Entre novamente com Google.");
+      const data = await response.json();
+      const next: Session = {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_at: Math.floor(Date.now() / 1000) + Number(data.expires_in || 3600),
+      };
+      await verifyOwner(next.access_token);
+      acceptSession(next);
+      return next;
+    })();
+    refreshingRef.current = pending;
+    try { return await pending; } finally { refreshingRef.current = null; }
+  }
+
   useEffect(() => {
     if (!url || !key) { setState("unconfigured"); return; }
-    // OAuth implicit callback: token is delivered in URL fragment, not sent to Next.js.
-    // Never store the access token in localStorage or logs in this transitional version.
-    const hash = new URLSearchParams(window.location.hash.slice(1));
-    const accessToken = hash.get("access_token");
-    const authError = hash.get("error_description") || hash.get("error");
-    if (!accessToken && !authError) { setState("signed-out"); return; }
-    window.history.replaceState(null, "", window.location.pathname + window.location.search);
-    if (authError) {
-      setError("Não foi possível concluir o login Google: " + authError.slice(0, 220));
-      setState("signed-out");
-      return;
+    let cancelled = false;
+    async function restore() {
+      const hash = new URLSearchParams(window.location.hash.slice(1));
+      const oauthToken = hash.get("access_token");
+      const oauthRefresh = hash.get("refresh_token");
+      const authError = hash.get("error_description") || hash.get("error");
+      if (oauthToken || authError) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+      if (authError) {
+        setError("Não foi possível concluir o login Google: " + authError.slice(0, 220));
+        setState("signed-out");
+        return;
+      }
+      try {
+        if (oauthToken) {
+          if (!oauthRefresh) throw new Error("O login não retornou uma sessão renovável. Entre novamente.");
+          await verifyOwner(oauthToken);
+          if (!cancelled) acceptSession({
+            access_token: oauthToken,
+            refresh_token: oauthRefresh,
+            expires_at: Math.floor(Date.now()/1000) + Number(hash.get("expires_in") || 3600),
+          });
+          return;
+        }
+        const raw = window.localStorage.getItem(sessionKey);
+        if (!raw) { if (!cancelled) setState("signed-out"); return; }
+        const saved = JSON.parse(raw) as Session;
+        if (!saved.access_token || !saved.refresh_token || !Number.isFinite(saved.expires_at))
+          throw new Error("Sessão inválida.");
+        if (saved.expires_at <= Date.now()/1000 + 90) {
+          await refreshSession(saved);
+        } else {
+          await verifyOwner(saved.access_token);
+          if (!cancelled) acceptSession(saved);
+        }
+      } catch (cause) {
+        if (!cancelled) {
+          clearSession();
+          setError(cause instanceof Error ? cause.message : "Não foi possível restaurar sua sessão.");
+        }
+      }
     }
-    verifyOwner(accessToken!).then(() => { setAccessToken(accessToken!); setState("authorized"); }).catch((cause: unknown) => {
-      setError(cause instanceof Error ? cause.message : "Não foi possível verificar o acesso.");
-      setState("signed-out");
-    });
+    void restore();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (state !== "authorized" || !sessionExpiry) return;
+    const delay = Math.max(1000, Math.min(2147483647, sessionExpiry * 1000 - Date.now() - 90000));
+    const timer = window.setTimeout(() => {
+      const current = sessionRef.current;
+      if (current) void refreshSession(current).catch((cause: unknown) => {
+        clearSession();
+        setError(cause instanceof Error ? cause.message : "Sessão expirada.");
+      });
+    }, delay);
+    return () => window.clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, sessionExpiry]);
+
+  async function signOut() {
+    const token = sessionRef.current?.access_token;
+    clearSession();
+    setError("");
+    if (token && url && key) {
+      try {
+        await fetch(url + "/auth/v1/logout", {
+          method: "POST",
+          headers: { apikey: key, Authorization: "Bearer " + token },
+        });
+      } catch { /* O encerramento local já foi concluído. */ }
+    }
+  }
 
   function signInGoogle() {
     if (!url || !key) return;
@@ -63,7 +168,7 @@ export default function MoneoAuthGate({ children }: { children: ReactNode }) {
     window.location.assign(destination.toString());
   }
 
-  if (state === "authorized") return <AuthTokenContext.Provider value={accessToken}>{children}</AuthTokenContext.Provider>;
+  if (state === "authorized") return <AuthTokenContext.Provider value={accessToken}><div className="fixed right-3 top-3 z-[100]"><button type="button" onClick={() => void signOut()} className="rounded-xl border border-[#DCE4EF] bg-white/95 px-4 py-2 text-xs font-semibold text-[#263D59] shadow-md hover:bg-[#F5F8FC]">Sair</button></div>{children}</AuthTokenContext.Provider>;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#EDF3FA] via-[#F8FAFD] to-[#E7EFF9] px-5 py-10 text-[#263D59]">
