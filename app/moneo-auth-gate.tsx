@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import MigrationBackup from "./migration-backup";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -26,6 +27,7 @@ export default function MoneoAuthGate({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>("loading");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [accessToken, setAccessToken] = useState("");
 
   useEffect(() => {
     if (!url || !key) { setState("unconfigured"); return; }
@@ -41,7 +43,7 @@ export default function MoneoAuthGate({ children }: { children: ReactNode }) {
       setState("signed-out");
       return;
     }
-    verifyOwner(accessToken!).then(() => setState("authorized")).catch((cause: unknown) => {
+    verifyOwner(accessToken!).then(() => { setAccessToken(accessToken!); setState("authorized"); }).catch((cause: unknown) => {
       setError(cause instanceof Error ? cause.message : "Não foi possível verificar o acesso.");
       setState("signed-out");
     });
@@ -59,7 +61,7 @@ export default function MoneoAuthGate({ children }: { children: ReactNode }) {
     window.location.assign(destination.toString());
   }
 
-  if (state === "authorized") return <>{children}</>;
+  if (state === "authorized") return <><MigrationBackup token={accessToken} />{children}</>;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#EDF3FA] via-[#F8FAFD] to-[#E7EFF9] px-5 py-10 text-[#263D59]">
