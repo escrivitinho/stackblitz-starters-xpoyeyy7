@@ -1,6 +1,8 @@
 
 "use client";
 
+import MoneoAuthGate from "./moneo-auth-gate";
+
 import { useEffect, useState } from "react";
 import CategoriesManager, { type Category } from "./categories-manager";
 import CardsManager, { type CardEntry } from "./cards-manager";
@@ -187,7 +189,7 @@ function displayDate(date: string) {
   return `${day}/${month}/${year}`;
 }
 
-export default function Home() {
+function Home() {
   const [active, setActive] = useState("Visão geral");
 
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
@@ -1867,4 +1869,9 @@ if (amountCents <= 0) {
       </section>
     </main>
   );
+}
+
+
+export default function Page() {
+  return <MoneoAuthGate><Home /></MoneoAuthGate>;
 }
