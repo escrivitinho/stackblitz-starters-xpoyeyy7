@@ -718,7 +718,6 @@ const newAccount: Account = {
         if(!window.confirm(`A subcategoria "${sub}" não existe em "${category.name}". Quer criar uma subcategoria nova?`))return;
         resolvedCategories=resolvedCategories.map(c=>c.id===category!.id?{...c,subcategories:[...c.subcategories,{id:"subcategory-"+crypto.randomUUID(),name:sub}]}:c);
       }
-      if(resolvedCategories!==categories)setCategories(resolvedCategories);
     }
 
     let amountCents: number;
@@ -764,9 +763,10 @@ if (amountCents <= 0) {
         amountCents: base + (index < remainder ? 1 : 0),
         importKey: "manual-card:" + groupId + ":" + (index + 1),
         categoryId: category?.id,
-        subcategoryId: category?.subcategories.find((item) => item.name === transactionSubcategory)?.id,
+        subcategoryId: category?.subcategories.find((item) => normalizedExcelText(item.name) === normalizedExcelText(transactionSubcategory))?.id,
         kind: "purchase" as const,
       }));
+      if(resolvedCategories!==categories)setCategories(resolvedCategories);
       setCardEntries((current) => [...current, ...created]);
       resetTransactionForm();
       return;
@@ -792,8 +792,8 @@ if (amountCents <= 0) {
           ? "Entre contas"
           : transactionSubcategory,
       source: "manual" as const,
-      categoryId: categories.find((category) => category.type === transactionType && category.name === (transactionType === "transfer" ? "Transferência" : transactionGroup))?.id,
-      subcategoryId: categories.find((category) => category.type === transactionType && category.name === (transactionType === "transfer" ? "Transferência" : transactionGroup))?.subcategories.find((subcategory) => subcategory.name === (transactionType === "transfer" ? "Entre contas" : transactionSubcategory))?.id,
+      categoryId: resolvedCategories.find((category) => category.type === transactionType && normalizedExcelText(category.name) === normalizedExcelText(transactionType === "transfer" ? "Transferência" : transactionGroup))?.id,
+      subcategoryId: resolvedCategories.find((category) => category.type === transactionType && normalizedExcelText(category.name) === normalizedExcelText(transactionType === "transfer" ? "Transferência" : transactionGroup))?.subcategories.find((subcategory) => normalizedExcelText(subcategory.name) === normalizedExcelText(transactionType === "transfer" ? "Entre contas" : transactionSubcategory))?.id,
       ...(paidFor.trim() ? { paidFor: paidFor.trim() } : {}),
     };
 
@@ -832,6 +832,7 @@ if (amountCents <= 0) {
       };
     }
 
+    if(resolvedCategories!==categories)setCategories(resolvedCategories);
     setTransactions((current) => [
       newTransaction,
       ...current,
