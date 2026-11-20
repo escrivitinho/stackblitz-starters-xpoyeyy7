@@ -702,6 +702,25 @@ const newAccount: Account = {
       return;
     }
 
+    // Confirma e cadastra novas classificações antes de salvar o lançamento.
+    let resolvedCategories=categories;
+    if(transactionType!=="transfer"){
+      const group=transactionGroup.trim();
+      const sub=transactionSubcategory.trim();
+      if(!group||!sub){setTransactionError("Informe a categoria e a subcategoria.");return;}
+      let category=resolvedCategories.find(c=>c.type===transactionType&&normalizedExcelText(c.name)===normalizedExcelText(group));
+      if(!category){
+        if(!window.confirm(`A categoria "${group}" não existe. Quer criar uma categoria nova?`))return;
+        category={id:"category-"+crypto.randomUUID(),name:group,type:transactionType,subcategories:[]};
+        resolvedCategories=[...resolvedCategories,category];
+      }
+      if(!category.subcategories.some(x=>normalizedExcelText(x.name)===normalizedExcelText(sub))){
+        if(!window.confirm(`A subcategoria "${sub}" não existe em "${category.name}". Quer criar uma subcategoria nova?`))return;
+        resolvedCategories=resolvedCategories.map(c=>c.id===category!.id?{...c,subcategories:[...c.subcategories,{id:"subcategory-"+crypto.randomUUID(),name:sub}]}:c);
+      }
+      if(resolvedCategories!==categories)setCategories(resolvedCategories);
+    }
+
     let amountCents: number;
 
 try {
@@ -735,7 +754,7 @@ if (amountCents <= 0) {
       const groupId = crypto.randomUUID();
       const base = Math.floor(amountCents / installments);
       const remainder = amountCents % installments;
-      const category = categories.find((item) => item.type === "expense" && item.name === transactionGroup);
+      const category = resolvedCategories.find((item) => item.type === "expense" && normalizedExcelText(item.name) === normalizedExcelText(transactionGroup));
       const created: CardEntry[] = Array.from({ length: installments }, (_, index) => ({
         id: crypto.randomUUID(), card: selectedCreditCard,
         purchaseDate: transactionDate,
@@ -1244,33 +1263,14 @@ if (amountCents <= 0) {
                     <>
                       <label className="space-y-2">
                         <span className="text-xs font-medium text-[#64748B]">Categoria</span>
-                        <select
-                          value={transactionGroup}
-                          onChange={(e) => {
-                            setTransactionGroup(e.target.value);
-                            setTransactionSubcategory(
-                              (availableGroups[e.target.value] || [])[0] || ""
-                            );
-                          }}
-                          className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none"
-                        >
-                          {Object.keys(availableGroups).map((group) => (
-                            <option key={group} value={group}>{group}</option>
-                          ))}
-                        </select>
+                        <input list="moneo-category-options" value={transactionGroup} onChange={e=>{setTransactionGroup(e.target.value);setTransactionSubcategory("");}} placeholder="Selecione ou digite uma nova categoria" className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none" />
+                        <datalist id="moneo-category-options">{Object.keys(availableGroups).map(group=><option key={group} value={group}/>)}</datalist>
                       </label>
 
                       <label className="space-y-2">
                         <span className="text-xs font-medium text-[#64748B]">Subcategoria</span>
-                        <select
-                          value={transactionSubcategory}
-                          onChange={(e) => setTransactionSubcategory(e.target.value)}
-                          className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none"
-                        >
-                          {availableSubcategories.map((subcategory) => (
-                            <option key={subcategory} value={subcategory}>{subcategory}</option>
-                          ))}
-                        </select>
+                        <input list="moneo-subcategory-options" value={transactionSubcategory} onChange={e=>setTransactionSubcategory(e.target.value)} placeholder="Selecione ou digite uma nova subcategoria" className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none" />
+                        <datalist id="moneo-subcategory-options">{availableSubcategories.map(sub=><option key={sub} value={sub}/>)}</datalist>
                       </label>
 
                       <label className="space-y-2 md:col-span-2">
