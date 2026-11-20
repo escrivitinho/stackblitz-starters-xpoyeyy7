@@ -1567,9 +1567,9 @@ if (amountCents <= 0) {
                     <div className="hidden md:block" />
                   </div>
                   {filteredTransactions.map((transaction) => (
-                    <div key={transaction.id} className="grid grid-cols-[80px_minmax(0,1fr)_auto] items-center gap-3 border-b border-[#EDF0F4] py-4 last:border-0 md:grid-cols-[100px_minmax(180px,2fr)_minmax(140px,1.4fr)_120px_60px]">
+                    <div key={transaction.id} role="button" tabIndex={0} aria-label={"Editar lançamento: " + (transaction.displayDescription || transaction.description)} onClick={() => startEdit(transaction)} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); startEdit(transaction); } }} className="grid cursor-pointer grid-cols-[80px_minmax(0,1fr)_auto] items-center gap-3 border-b border-[#EDF0F4] py-4 transition-colors hover:bg-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7C9AC3] last:border-0 md:grid-cols-[100px_minmax(180px,2fr)_minmax(140px,1.4fr)_120px_60px]">
                       <span className="text-xs text-[#64748B]">{displayDate(transaction.date)}</span>
-                      <button type="button" onClick={() => startEdit(transaction)} title="Editar descrição exibida e classificação" className="min-w-0 text-left">
+                      <button type="button" onClick={(event) => { event.stopPropagation(); startEdit(transaction); }} title="Editar descrição exibida e classificação" className="min-w-0 text-left">
                         <span className="block break-words text-sm font-medium text-[#35445A] hover:text-blue-700">{transaction.displayDescription || transaction.description}</span>
                         <span className="mt-1 block text-[11px] text-[#94A0AF]">{getTransactionAccountName(transaction)}</span>
                       </button>
@@ -1580,7 +1580,7 @@ if (amountCents <= 0) {
                       <p className={`col-start-3 row-start-1 whitespace-nowrap text-right text-sm font-semibold md:col-start-4 ${transaction.type === "income" ? "text-emerald-700" : transaction.type === "expense" ? "text-[#B65D58]" : "text-[#526B8B]"}`}>
                         {transaction.type === "income" ? "+" : transaction.type === "expense" ? "−" : ""}{money(transaction.amountCents)}
                       </p>
-                      <button type="button" onClick={() => deleteTransaction(transaction.id)} className="col-start-3 text-right text-xs text-[#A0AABA] hover:text-rose-600 md:col-start-5 md:row-start-1" title="Excluir lançamento">Excluir</button>
+                      <button type="button" onClick={(event) => { event.stopPropagation(); deleteTransaction(transaction.id); }} className="col-start-3 text-right text-xs text-[#A0AABA] hover:text-rose-600 md:col-start-5 md:row-start-1" title="Excluir lançamento">Excluir</button>
                     </div>
                   ))}
                 </div>
