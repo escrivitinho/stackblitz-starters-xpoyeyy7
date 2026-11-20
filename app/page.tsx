@@ -11,8 +11,7 @@ import InvestmentsManager from "./investments-manager";
 import MonthlyReport from "./monthly-report";
 import DescriptionRules, {matchDescriptionRule, type DescriptionRule} from "./description-rules";
 import TopExpenses from "./top-expenses";
-import ClassificationPreview, { excelRules } from "./classification-preview";
-import ExcelReclassification from "./excel-reclassification";
+import { excelRules } from "./classification-preview";
 import { formatCents, parseMoneyToCents } from "./lib/money";
 import {
   calculateTransactionTotals,
@@ -1903,8 +1902,6 @@ if (amountCents <= 0) {
 
         {active === "Relatórios" && <MonthlyReport transactions={transactions} categories={categories} />}
 
-        {active === "Configurações" && <ExcelReclassification transactions={transactions} categories={categories} onApply={(items, cats) => { setCategories(cats); setTransactions(items); }} />}
-        {active === "Configurações" && <ClassificationPreview transactions={transactions} categories={categories} onApply={(ids, categoryId, subcategoryId) => setTransactions(current => current.map(t => ids.includes(t.id) && t.type !== "transfer" && !t.internalTransferPairId && !t.categoryId && !t.subcategoryId ? { ...t, categoryId, subcategoryId, group: categories.find(c => c.id === categoryId)?.name ?? t.group, subcategory: categories.find(c => c.id === categoryId)?.subcategories.find(sub => sub.id === subcategoryId)?.name ?? t.subcategory } : t))} />}
         {active === "Configurações" && (
           <div className="rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm backdrop-blur-2xl">
             <h2 className="text-xl font-semibold text-[#26364D]">Backup e restauração</h2>
