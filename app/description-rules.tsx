@@ -9,15 +9,15 @@ export function matchDescriptionRule(description:string,rules:DescriptionRule[],
 }
 type BulkRow={line:number;term:string;category:string;subcategory:string;categoryId?:string;subcategoryId?:string;issue?:string};
 function parseBulk(text:string):Array<{line:number;term:string;category:string;subcategory:string}> {
- return text.split(/\\r?\\n/).flatMap((raw,index)=>{
+ return text.split(/\r?\n/).flatMap((raw,index)=>{
   const line=raw.trim();
-  if(!line || /^\\|?\\s*:?-{3,}/.test(line))return [];
+  if(!line || /^\|?\s*:?-{3,}/.test(line))return [];
   let parts:string[];
-  if(line.startsWith("|"))parts=line.replace(/^\\|/,"").replace(/\\|$/,"").split("|").map(x=>x.trim().replace(/^\\*\\*(.*)\\*\\*$/,"$1"));
-  else if(line.includes("\\t"))parts=line.split("\\t").map(x=>x.trim());
+  if(line.startsWith("|"))parts=line.replace(/^\|/,"").replace(/\|$/,"").split("|").map(x=>x.trim().replace(/^\*\*(.*)\*\*$/,"$1"));
+  else if(line.includes("\t"))parts=line.split("\t").map(x=>x.trim());
   else if(line.includes(";"))parts=line.split(";").map(x=>x.trim());
   else return [{line:index+1,term:line,category:"",subcategory:""}];
-  if(normalizeRuleText(parts[0]||"").replace(/[_\\s]/g,"")==="palavrachave")return [];
+  if(normalizeRuleText(parts[0]||"").replace(/[_\s]/g,"")==="palavrachave")return [];
   return [{line:index+1,term:parts[0]||"",category:parts[1]||"",subcategory:parts[2]||""}];
  });
 }
