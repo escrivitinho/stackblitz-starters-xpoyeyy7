@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { formatCents, parseMoneyToCents } from "./lib/money";
 
-type Investment = { id: string; name: string; category: string; institution: string; investedCents: number; currentCents: number; date: string };
+type Valuation = { id: string; date: string; valueCents: number };
+type Investment = { valuations?: Valuation[]; id: string; name: string; category: string; institution: string; investedCents: number; currentCents: number; date: string };
 const KEY = "moneo-investments-v1";
 const types = ["CDB", "Tesouro Direto", "LCI / LCA", "Ações", "FIIs", "ETF", "Fundos", "Criptomoedas", "Outros"];
 
@@ -18,6 +19,10 @@ export default function InvestmentsManager() {
   const [current, setCurrent] = useState("");
   const [date, setDate] = useState(() => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); });
   const [error, setError] = useState("");
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [updatedValue, setUpdatedValue] = useState("");
+  const [updatedDate, setUpdatedDate] = useState("");
+  const [updateError, setUpdateError] = useState("");
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(KEY);
@@ -35,8 +40,21 @@ export default function InvestmentsManager() {
     if (!name.trim() || investedCents === null || currentCents === null || investedCents < 0 || currentCents < 0 || !date) {
       setError("Informe nome, data e valores válidos para cadastrar o investimento."); return;
     }
-    setItems((previous) => [{ id: crypto.randomUUID(), name: name.trim(), category, institution: institution.trim(), investedCents, currentCents, date }, ...previous]);
+    setItems((previous) => [{ id: crypto.randomUUID(), name: name.trim(), category, institution: institution.trim(), investedCents, currentCents, date, valuations: [{ id: crypto.randomUUID(), date, valueCents: currentCents }] }, ...previous]);
     setName(""); setInstitution(""); setInvested(""); setCurrent(""); setError(""); setFormOpen(false);
+  }
+  function updateValue(item: Investment) {
+    const valueCents = parseMoneyToCents(updatedValue);
+    if (valueCents === null || valueCents < 0 || !updatedDate || !/^\d{4}-\d{2}-\d{2}$/.test(updatedDate)) {
+      setUpdateError("Informe uma data e um valor atual válidos."); return;
+    }
+    const history = item.valuations ?? [{ id: item.id + "-initial", date: item.date, valueCents: item.currentCents }];
+    const lastDate = history.reduce((latest, point) => point.date > latest ? point.date : latest, "");
+    if (updatedDate < lastDate) { setUpdateError("A data não pode ser anterior à última atualização registrada."); return; }
+    setItems((previous) => previous.map((entry) => entry.id === item.id
+      ? { ...entry, currentCents: valueCents, valuations: [...history, { id: crypto.randomUUID(), date: updatedDate, valueCents }] }
+      : entry));
+    setUpdatingId(null); setUpdatedValue(""); setUpdateError("");
   }
   return <section className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -65,9 +83,30 @@ export default function InvestmentsManager() {
     <div className="rounded-3xl border border-white/90 bg-white/60 p-5 shadow-sm backdrop-blur-2xl md:p-6">
       <h3 className="font-semibold text-[#26364D]">Minha carteira ({items.length})</h3>
       {items.length === 0 ? <p className="mt-5 text-sm text-[#64748B]">Nenhum investimento cadastrado. Adicione seu primeiro ativo para começar.</p> :
-        <div className="mt-4 space-y-2">{items.map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/90 bg-white/55 p-4 backdrop-blur-xl">
+        <div className="mt-4 space-y-2">{items.map((item) => <div key={item.id} className="rounded-2xl border border-white/90 bg-white/55 p-4 backdrop-blur-xl"><div className="flex flex-wrap items-center justify-between gap-3">
           <div><p className="text-sm font-semibold text-[#26364D]">{item.name}</p><p className="mt-1 text-xs text-[#64748B]">{item.category} · {item.institution || "Sem instituição"} · {item.date.split("-").reverse().join("/")}</p></div>
-          <div className="flex items-center gap-4"><div className="text-right"><p className="text-sm font-semibold text-blue-700">{formatCents(item.currentCents)}</p><p className="text-xs text-[#64748B]">Aplicado: {formatCents(item.investedCents)}</p></div><button type="button" onClick={() => { if (window.confirm("Excluir este investimento da carteira?")) setItems((previous) => previous.filter((entry) => entry.id !== item.id)); }} className="rounded-xl border border-rose-200 bg-rose-100/40 px-3 py-2 text-xs text-rose-700 backdrop-blur-xl">Excluir</button></div>
+          <div className="flex items-center gap-4"><div className="text-right"><p className="text-sm font-semibold text-blue-700">{formatCents(item.currentCents)}</p><p className="text-xs text-[#64748B]">Aplicado: {formatCents(item.investedCents)}</p></div><button type="button" onClick={() => { setUpdatingId(item.id); setUpdatedValue((item.currentCents / 100).toFixed(2).replace(".", ",")); setUpdatedDate(new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)); setUpdateError(""); }} className="rounded-xl border border-blue-300/80 bg-blue-300/35 px-3 py-2 text-xs font-semibold text-blue-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-xl hover:bg-blue-300/55">Atualizar valor</button><button type="button" onClick={() => { if (window.confirm("Excluir este investimento da carteira?")) setItems((previous) => previous.filter((entry) => entry.id !== item.id)); }} className="rounded-xl border border-rose-200 bg-rose-100/40 px-3 py-2 text-xs text-rose-700 backdrop-blur-xl">Excluir</button></div>
+        </div>
+        {updatingId === item.id && <div className="mt-4 rounded-2xl border border-blue-200/70 bg-blue-50/50 p-4 backdrop-blur-xl">
+          <p className="mb-3 text-sm font-semibold text-blue-900">Atualizar valor de {item.name}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="space-y-1 text-xs text-[#64748B]">Data da consulta<input type="date" value={updatedDate} onChange={(e) => setUpdatedDate(e.target.value)} className="block w-full rounded-xl border border-white bg-white/75 p-3 text-sm text-[#26364D]" /></label>
+            <label className="space-y-1 text-xs text-[#64748B]">Saldo atual informado pelo banco (R$)<input inputMode="decimal" value={updatedValue} onChange={(e) => setUpdatedValue(e.target.value)} className="block w-full rounded-xl border border-white bg-white/75 p-3 text-sm text-[#26364D]" /></label>
+          </div>
+          {updateError && <p className="mt-2 text-xs text-rose-700">{updateError}</p>}
+          <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setUpdatingId(null)} className="rounded-xl border border-white bg-white/70 px-4 py-2 text-xs">Cancelar</button><button type="button" onClick={() => updateValue(item)} className="rounded-xl border border-blue-300 bg-blue-300/45 px-4 py-2 text-xs font-semibold text-blue-900 backdrop-blur-xl">Salvar atualização</button></div>
+        </div>}
+        {(item.valuations?.length ?? 0) > 1 && <div className="mt-3 border-t border-white/80 pt-3">
+          <p className="mb-2 text-xs font-semibold text-[#64748B]">Histórico de atualizações</p>
+          <div className="space-y-1">{(item.valuations ?? []).slice(1).reverse().map((point, index) => {
+            const chronological = item.valuations ?? [];
+            const position = chronological.length - 1 - index;
+            const previous = chronological[position - 1];
+            const change = point.valueCents - (previous?.valueCents ?? point.valueCents);
+            return <div key={point.id} className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#64748B]"><span>{point.date.split("-").reverse().join("/")}</span><span>{formatCents(point.valueCents)} <span className={change >= 0 ? "text-emerald-700" : "text-rose-700"}>({change >= 0 ? "+" : ""}{formatCents(change)})</span></span></div>;
+          })}</div>
+          <p className="mt-2 text-[11px] text-[#94A0AF]">Variação entre consultas, não rendimento mensal. Aportes e resgates ainda precisam ser registrados separadamente.</p>
+        </div>}
         </div>)}</div>}
     </div>
     <p className="text-xs text-[#94A0AF]">Carteira manual: os valores atuais são informados por você. Nesta primeira versão, os investimentos não movimentam automaticamente o saldo bancário nem os totais de receitas e despesas.</p>
