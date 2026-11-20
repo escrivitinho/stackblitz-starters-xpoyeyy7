@@ -193,7 +193,7 @@ export default function Home() {
   const [cardEntries, setCardEntries] = useState<CardEntry[]>([]);
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
   const [transactionTab, setTransactionTab] = useState<"all" | "pending" | "transfers">("all");
-  const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "income" | "expense">("all");
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "income" | "expense" | "uncategorized">("all");
   const [transactionMonthFilter, setTransactionMonthFilter] = useState("");
   const [rejectedTransferPairs, setRejectedTransferPairs] = useState<string[]>([]);
   const transferPairKey = (a: number, b: number) => [a, b].sort((x, y) => x - y).join(":");
@@ -227,7 +227,7 @@ export default function Home() {
     ).length === 1);
 
   const filteredTransactions = transactions.filter((item) =>
-    (transactionTypeFilter === "all" || item.type === transactionTypeFilter) &&
+    (transactionTypeFilter === "all" || (transactionTypeFilter === "uncategorized" ? (!item.categoryId || !item.subcategoryId || normalizedExcelText(item.group) === "outros" || normalizedExcelText(item.subcategory) === "outros") : item.type === transactionTypeFilter)) &&
     (!transactionMonthFilter || item.date.startsWith(transactionMonthFilter))
   );
 
@@ -1369,6 +1369,7 @@ if (amountCents <= 0) {
                       ["all", "Todos"],
                       ["income", "Receitas"],
                       ["expense", "Despesas"],
+                      ["uncategorized", "Sem categoria"],
                     ] as const).map(([filter, label]) => (
                       <button key={filter} type="button" onClick={() => setTransactionTypeFilter(filter)}
                         aria-pressed={transactionTypeFilter === filter}
