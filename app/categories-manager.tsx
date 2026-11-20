@@ -46,8 +46,8 @@ const typeAccents: Record<CategoryType, { border: string; icon: string; number: 
 };
 
 const typeIcons: Record<CategoryType, string> = {
-  income: "↙",
-  expense: "↗",
+  income: "↑",
+  expense: "↓",
   transfer: "⇄",
 };
 
