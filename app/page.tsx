@@ -243,14 +243,14 @@ export default function Home() {
     setEditId(item.id);
     setEditCategoryId(item.categoryId || "");
     setEditSubcategoryId(item.subcategoryId || "");
-    setEditDescription(item.description);
+    setEditDescription(item.displayDescription || item.description);
     setEditPaidFor(item.paidFor || "");
   }
   function saveEdit() {
     const category = editCategories.find((item) => item.id === editCategoryId);
     const subcategory = category?.subcategories.find((item) => item.id === editSubcategoryId);
     setTransactions((current) => current.map((item) => item.id === editId ? { ...item,
-      description: editDescription.trim() || item.description, paidFor: editPaidFor.trim(),
+      displayDescription: editDescription.trim() && editDescription.trim() !== item.description ? editDescription.trim() : undefined, paidFor: editPaidFor.trim(),
       categoryId: category?.id, subcategoryId: subcategory?.id,
       group: category?.name || item.group, subcategory: subcategory?.name || (category ? "" : item.subcategory)
     } : item));
@@ -1327,7 +1327,7 @@ if (amountCents <= 0) {
               <div role="dialog" aria-modal="true" aria-label="Classificar lançamento" onClick={(event) => event.stopPropagation()} className="w-full max-w-xl space-y-4 rounded-3xl border border-white bg-[#F8FAFD] p-6 shadow-2xl">
                 <h3 className="text-lg font-semibold text-[#26364D]">Classificar lançamento</h3>
                 <p className="text-xs text-[#64748B]">{displayDate(editItem.date)} · {getTransactionAccountName(editItem)} · {money(editItem.amountCents)}</p>
-                <label className="block space-y-2"><span className="text-xs text-[#64748B]">Descrição</span><input value={editDescription} onChange={(event) => setEditDescription(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-3 text-sm" /></label>
+                <label className="block space-y-2"><span className="text-xs text-[#64748B]">Descrição exibida (o texto original do extrato será preservado)</span><input value={editDescription} onChange={(event) => setEditDescription(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-3 text-sm" /></label>
                 {editItem.type !== "transfer" && <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block space-y-2"><span className="text-xs text-[#64748B]">Categoria</span><select value={editCategoryId} onChange={(event) => { setEditCategoryId(event.target.value); setEditSubcategoryId(""); }} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-3 text-sm"><option value="">Selecione</option>{editCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
                   <label className="block space-y-2"><span className="text-xs text-[#64748B]">Subcategoria</span><select value={editSubcategoryId} onChange={(event) => setEditSubcategoryId(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-3 text-sm"><option value="">Selecione</option>{editCategory?.subcategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
@@ -1405,55 +1405,24 @@ if (amountCents <= 0) {
                 </div>
               ) : (
                 <div className="space-y-1">
+                  <div className="hidden grid-cols-[100px_minmax(180px,2fr)_minmax(140px,1.4fr)_120px_60px] gap-3 border-b border-[#E2E8F0] pb-3 text-xs font-semibold uppercase tracking-wide text-[#8190A4] md:grid">
+                    <span>Data</span><span>Descrição</span><span>Categoria / Subcategoria</span><span className="text-right">Valor</span><span />
+                  </div>
                   {filteredTransactions.map((transaction) => (
-                    <div
-                      key={transaction.id}
-                      onClick={() => startEdit(transaction)}
-                      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-[#EDF0F4] py-4 hover:bg-white/60 last:border-0"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                          transaction.type === "income"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : transaction.type === "transfer"
-                            ? "bg-blue-50 text-blue-700"
-                            : "bg-rose-50 text-rose-600"
-                        }`}>
-                          {transaction.type === "income" ? "↗" : transaction.type === "transfer" ? "⇄" : "↘"}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-[#35445A]">
-                            {transaction.description}
-                          </p>
-                          <p className="mt-1 text-xs text-[#94A0AF]">
-                            {getCategoryNames(transaction).group} · {getCategoryNames(transaction).subcategory}
-                          </p>
-                          <p className="mt-1 text-[11px] text-[#A0AABA]">
-                            {displayDate(transaction.date)} · {getTransactionAccountName(transaction)}
-                            {transaction.paidFor ? ` · Por conta de ${transaction.paidFor}` : ""}
-                          </p>
-                        </div>
+                    <div key={transaction.id} className="grid grid-cols-[80px_minmax(0,1fr)_auto] items-center gap-3 border-b border-[#EDF0F4] py-4 last:border-0 md:grid-cols-[100px_minmax(180px,2fr)_minmax(140px,1.4fr)_120px_60px]">
+                      <span className="text-xs text-[#64748B]">{displayDate(transaction.date)}</span>
+                      <button type="button" onClick={() => startEdit(transaction)} title="Editar descrição exibida e classificação" className="min-w-0 text-left">
+                        <span className="block break-words text-sm font-medium text-[#35445A] hover:text-blue-700">{transaction.displayDescription || transaction.description}</span>
+                        <span className="mt-1 block text-[11px] text-[#94A0AF]">{getTransactionAccountName(transaction)}</span>
+                      </button>
+                      <div className="col-span-2 min-w-0 pl-[92px] md:col-span-1 md:pl-0">
+                        <p className="break-words text-xs font-medium text-[#526B8B]">{getCategoryNames(transaction).group}</p>
+                        <p className="mt-1 break-words text-xs text-[#94A0AF]">{getCategoryNames(transaction).subcategory}</p>
                       </div>
-
-                      <div className="flex shrink-0 items-center justify-end gap-3 whitespace-nowrap">
-                        <p className={`whitespace-nowrap text-sm font-semibold ${
-                          transaction.type === "income"
-                            ? "text-emerald-700"
-                            : transaction.type === "expense"
-                            ? "text-[#B65D58]"
-                            : "text-[#526B8B]"
-                        }`}>
-                          {transaction.type === "income" ? "+" : transaction.type === "expense" ? "−" : ""}
-                          {money(transaction.amountCents)}
-                        </p>
-                        <button
-                          onClick={(event) => { event.stopPropagation(); deleteTransaction(transaction.id); }}
-                          className="rounded-lg px-2 py-2 text-xs text-[#A0AABA] hover:bg-rose-50 hover:text-rose-600"
-                          title="Excluir lançamento"
-                        >
-                          Excluir
-                        </button>
-                      </div>
+                      <p className={`col-start-3 row-start-1 whitespace-nowrap text-right text-sm font-semibold md:col-start-4 ${transaction.type === "income" ? "text-emerald-700" : transaction.type === "expense" ? "text-[#B65D58]" : "text-[#526B8B]"}`}>
+                        {transaction.type === "income" ? "+" : transaction.type === "expense" ? "−" : ""}{money(transaction.amountCents)}
+                      </p>
+                      <button type="button" onClick={() => deleteTransaction(transaction.id)} className="col-start-3 text-right text-xs text-[#A0AABA] hover:text-rose-600 md:col-start-5 md:row-start-1" title="Excluir lançamento">Excluir</button>
                     </div>
                   ))}
                 </div>
