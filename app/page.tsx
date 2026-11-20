@@ -117,13 +117,13 @@ const initialTransactions: Transaction[] = [];
 
 const navigation = [
   { name: "Visão geral", icon: "▦" },
+  { name: "Relatórios", icon: "▥" },
   { name: "Lançamentos", icon: "⇄" },
   { name: "Categorias", icon: "⌁" },
   { name: "Contas", icon: "▤" },
   { name: "Cartões", icon: "▣" },
   { name: "Investimentos", icon: "◈" },
   { name: "Orçamento", icon: "◷" },
-  { name: "Relatórios", icon: "▥" },
 ];
 
 const initialCategories: Category[] = [
