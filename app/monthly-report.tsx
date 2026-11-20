@@ -91,7 +91,7 @@ export default function MonthlyReport({transactions,categories}:{transactions:Tr
 </>}
   {reportTab==="analytic"&&<div className="space-y-6">
    <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-[#718096]">Categorias e subcategorias por mês, separadas por tipo de movimentação.</p><button type="button" onClick={()=>setCollapsedCategories(allCollapsed?[]:allCategoryKeys)} className="rounded-xl border border-white/90 bg-white/75 px-4 py-2 text-xs font-semibold text-[#455A64] shadow-sm backdrop-blur-xl transition hover:bg-white">{allCollapsed?"Expandir todas as subcategorias":"Recolher todas as subcategorias"}</button></div>
-   {categoryRows.map(section=><section key={section.type} className={`overflow-x-auto rounded-3xl border p-5 shadow-[0_12px_36px_rgba(52,72,99,0.08)] backdrop-blur-2xl ${section.type==="income"?"border-[#C8E6C9]/70 bg-[#E5F3E6]/35":"border-[#FFCDD2]/70 bg-[#FCE8E8]/35"}`}>
+   {categoryRows.map(section=>{ const totalFill=section.type==="income"?"bg-[#A9DBB5]/85":"bg-[#F0ABB4]/85"; return <section key={section.type} className={`overflow-x-auto rounded-3xl border p-5 shadow-[0_12px_36px_rgba(52,72,99,0.08)] backdrop-blur-2xl ${section.type==="income"?"border-[#C8E6C9]/70 bg-[#E5F3E6]/35":"border-[#FFCDD2]/70 bg-[#FCE8E8]/35"}`}>
     <h3 className={`mb-2 text-lg font-semibold ${section.type==="income"?"text-[#1B5E20]":"text-[#B71C1C]"}`}>{section.type==="income"?"Receitas":"Despesas"}</h3>
     <p className="mb-4 text-xs text-[#718096]">Subcategorias abertas por padrão. Clique em cada categoria para recolher ou expandir.</p>
    <table className="w-full min-w-[1250px] border-collapse text-xs">
@@ -115,7 +115,7 @@ export default function MonthlyReport({transactions,categories}:{transactions:Tr
 
     </tbody>
    </table>
-   </section>)}
+   </section>})}
   </div>}
  </div>;
 }
