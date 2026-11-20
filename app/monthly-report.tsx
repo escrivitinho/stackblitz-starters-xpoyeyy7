@@ -12,7 +12,14 @@ export default function MonthlyReport({transactions,categories}:{transactions:Tr
  const [reportTab,setReportTab]=useState<"charts"|"analytic"|"monthly">("charts");
  const year=selectedYear!==null&&years.includes(selectedYear)?selectedYear:(years[0]??new Date().getFullYear());
  const classified=useMemo(()=>transactions.map(t=>{
-  const category=categories.find(c=>c.id===t.categoryId) || categories.find(c=>c.name===t.group && (c.type===t.type || c.type==="expense" && t.type==="income"));
+  // Reembolsos são entradas bancárias, mas pertencem à categoria de despesa.
+  // Priorizar o ID e depois a combinação categoria/subcategoria evita que
+  // categorias de receita homônimas capturem indevidamente um reembolso.
+  const normalize=(value:string)=>value.trim().normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLocaleLowerCase("pt-BR");
+  const byId=categories.find(c=>c.id===t.categoryId);
+  const sameName=categories.filter(c=>normalize(c.name)===normalize(t.group||""));
+  const bySubcategory=sameName.find(c=>c.type==="expense"&&c.subcategories.some(sub=>sub.id===t.subcategoryId||normalize(sub.name)===normalize(t.subcategory||"")));
+  const category=byId || bySubcategory || (t.type==="income"?sameName.find(c=>c.type==="expense"):undefined) || sameName.find(c=>c.type===t.type);
   const type=category?.type==="expense"||category?.type==="income"?category.type:t.type;
   const direction=t.type==="income"?1:t.type==="expense"?-1:0;
   const signedAmount=type==="income"?direction*t.amountCents:-direction*t.amountCents;
@@ -43,7 +50,7 @@ export default function MonthlyReport({transactions,categories}:{transactions:Tr
    }
    return {type,rows:Array.from(rows.values()).sort((a,b)=>a.name.localeCompare(b.name,"pt-BR"))};
   });
- },[transactions,year]);
+ },[classified,year]);
  const [collapsedCategories,setCollapsedCategories]=useState<string[]>([]);
  const allCategoryKeys=categoryRows.flatMap(section=>section.rows.map(row=>section.type+"-"+row.name));
  const allCollapsed=allCategoryKeys.length>0&&allCategoryKeys.every(key=>collapsedCategories.includes(key));
