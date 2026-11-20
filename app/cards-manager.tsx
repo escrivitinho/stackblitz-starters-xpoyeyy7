@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatCents } from "./lib/money";
 import type { Category } from "./categories-manager";
+import { classifyCardByDescription, type DescriptionRule } from "./description-rules";
 
 export type CardEntry = {
   id: string;
@@ -101,7 +102,7 @@ export function parseNubankCsv(text: string): Draft[] {
   });
 }
 
-export default function CardsManager({ entries, onChange, categories, importOnly = false, driveFile }: { entries: CardEntry[]; onChange: (entries: CardEntry[]) => void; categories: Category[]; importOnly?: boolean; driveFile?: File | null }) {
+export default function CardsManager({ entries, onChange, categories, descriptionRules = [], importOnly = false, driveFile }: { entries: CardEntry[]; onChange: (entries: CardEntry[]) => void; categories: Category[]; descriptionRules?: DescriptionRule[]; importOnly?: boolean; driveFile?: File | null }) {
   const [openedCard, setOpenedCard] = useState<CardEntry["card"] | null>(null);
   const [openedInvoice, setOpenedInvoice] = useState<string | null>(null);
   const [manualCard, setManualCard] = useState<CardEntry["card"]>("Nubank Crédito");
@@ -169,7 +170,7 @@ export default function CardsManager({ entries, onChange, categories, importOnly
   },[driveFile]);
   function confirmImport() {
     if (!newEntries.length) return;
-    onChange([...entries, ...newEntries.map((entry) => ({ ...entry, id: crypto.randomUUID() }))]);
+    onChange([...entries, ...newEntries.map((entry) => classifyCardByDescription({ ...entry, id: crypto.randomUUID() },descriptionRules,categories))]);
     setMessage(newEntries.length + " movimentações importadas para Nubank Crédito.");
     setPreview([]); setFileName("");
   }
