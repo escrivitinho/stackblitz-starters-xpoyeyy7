@@ -16,7 +16,7 @@ export default function ClassificationPreview({ transactions, categories, onAppl
  const { proposals, skipped } = useMemo(() => {
   const proposals: Proposal[] = []; let skipped = 0;
   for (const transaction of transactions) {
-   if (transaction.source === "manual" || transaction.type === "transfer" || transaction.internalTransferPairId || transaction.categoryId || transaction.subcategoryId) continue;
+   if (transaction.source === "manual" || transaction.type === "transfer" || transaction.internalTransferPairId || (transaction.categoryId && normalize(transaction.group) !== "outros") || (transaction.subcategoryId && normalize(transaction.group) !== "outros")) continue;
    const matches = source.filter(([word, , , type]) => type === transaction.type && normalize(transaction.description).includes(normalize(word)));
    if (!matches.length) continue;
    const destinations = new Set(matches.map(([,cat,sub]) => normalize(cat)+"|"+normalize(sub)));
@@ -31,7 +31,7 @@ export default function ClassificationPreview({ transactions, categories, onAppl
  }, [transactions, categories]);
  return <div className="rounded-3xl border border-white/90 bg-white/60 p-5 shadow-sm backdrop-blur-2xl">
   <h3 className="text-sm font-semibold text-[#26364D]">De-para · prévia de classificação</h3>
-  <p className="mt-2 text-xs leading-5 text-[#64748B]">Etapa piloto com 25 regras do Excel. Apenas receitas e despesas ainda sem IDs de classificação; transferências, regras conflitantes e categorias inexistentes são preservadas para revisão.</p>
+  <p className="mt-2 text-xs leading-5 text-[#64748B]">Base com 100 regras do Excel. Apenas receitas e despesas ainda sem IDs de classificação; transferências, regras conflitantes e categorias inexistentes são preservadas para revisão.</p>
   <button type="button" onClick={()=>{setShow(v=>!v);setConfirmed(false)}} className="mt-3 rounded-xl border border-blue-300 bg-blue-200/50 px-4 py-2 text-xs font-semibold text-blue-900 backdrop-blur-xl">{show ? "Ocultar prévia" : "Analisar lançamentos"}</button>
   {show && <div className="mt-4 space-y-3">
    <p className="text-sm text-[#26364D]"><strong>{proposals.length}</strong> lançamento(s) elegíveis · {skipped} correspondência(s) exigem revisão</p>
