@@ -199,7 +199,6 @@ export default function Home() {
   const [rejectedTransferPairs, setRejectedTransferPairs] = useState<string[]>([]);
   const transferPairKey = (a: number, b: number) => [a, b].sort((x, y) => x - y).join(":");
   function confirmTransferPair(outgoingId: number, incomingId: number) {
-    if (!window.confirm("Confirmar que esta saída e entrada são uma transferência entre suas próprias contas? Os registros serão preservados, mas deixarão de contar como receita e despesa.")) return;
     const pairId = "internal:" + transferPairKey(outgoingId, incomingId);
     setTransactions((current) => current.map((item) =>
       item.id === outgoingId || item.id === incomingId ? { ...item, internalTransferPairId: pairId } : item
