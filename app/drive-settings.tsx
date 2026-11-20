@@ -136,6 +136,7 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
           }
           tokenRef.current = response.access_token;
           setConnected(true);
+          void runAutomaticImport(response.access_token);
         },
         error_callback: (failure) => {
           setBusy(false);
@@ -159,9 +160,21 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
   }
 
 
-  async function checkFolders() {
-    const token = tokenRef.current;
-    if (!token) return;
+  async function runAutomaticImport(token: string) {
+    setSyncProgress("Autorização concluída. Localizando pastas...");
+    const located = await checkFolders(token);
+    if (!located) { setSyncProgress(""); return; }
+    const missing = folders.filter(folder => folder.format === "OFX" && !located.some(result => result.path === folder.path && result.status === "found"));
+    if (missing.length) { setError("Não foi possível localizar todas as pastas bancárias: " + missing.map(folder => folder.label).join(", ") + ". Nenhuma importação automática foi iniciada."); setSyncProgress(""); return; }
+    setSyncProgress("Pastas localizadas. Procurando extratos...");
+    const discovered = await checkFiles(located, token);
+    if (!discovered) { setSyncProgress(""); return; }
+    await syncAllOfx(located, discovered, token);
+  }
+
+  async function checkFolders(authorizedToken?: string): Promise<FolderResult[] | null> {
+    const token = authorizedToken ?? tokenRef.current;
+    if (!token) return null;
     setChecking(true);
     setError("");
     setResults(null);
@@ -186,17 +199,20 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
         output.push({ path: folder.path, status, id: status === "found" ? parent : undefined });
       }
       setResults(output);
+      return output;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao localizar pastas.");
+      return null;
     } finally {
       setChecking(false);
     }
   }
 
 
-  async function checkFiles() {
-    const token = tokenRef.current;
-    if (!token || !results) return;
+  async function checkFiles(folderResults?: FolderResult[], authorizedToken?: string): Promise<FileResult[] | null> {
+    const token = authorizedToken ?? tokenRef.current;
+    const resolvedFolders = folderResults ?? results;
+    if (!token || !resolvedFolders) return null;
     setLoadingFiles(true);
     setError("");
     setFiles(null);
@@ -233,14 +249,16 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
         } while (pageToken);
       };
       for (const folder of folders) {
-        const found = results.find((item) => item.path === folder.path);
+        const found = resolvedFolders.find((item) => item.path === folder.path);
         if (!found?.id || found.status !== "found") continue;
         await collectFiles(found.id, folder.path, folder.format, 0);
       }
       output.sort((a, b) => (b.modifiedTime || "").localeCompare(a.modifiedTime || ""));
       setFiles(output);
+      return output;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível listar os arquivos.");
+      return null;
     } finally {
       setLoadingFiles(false);
     }
@@ -342,17 +360,18 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
     }
   }
 
-  async function syncAllOfx() {
-    const token = tokenRef.current;
+  async function syncAllOfx(folderResults?: FolderResult[], discoveredFiles?: FileResult[], authorizedToken?: string) {
+    const token = authorizedToken ?? tokenRef.current;
+    const resolvedFolders = folderResults ?? results;
+    const resolvedFiles = discoveredFiles ?? files;
     const bankFolders = folders.filter((folder) => folder.format === "OFX");
-    if (!token || !files || !results || syncing) return;
-    if (!bankFolders.every((folder) => results.some((result) => result.path === folder.path && result.status === "found"))) {
+    if (!token || !resolvedFiles || !resolvedFolders || syncing) return;
+    if (!bankFolders.every((folder) => resolvedFolders.some((result) => result.path === folder.path && result.status === "found"))) {
       setError("Localize as três pastas bancárias antes de sincronizar.");
       return;
     }
-    const bankFiles = files.filter((file) => isBankOfx(file));
+    const bankFiles = resolvedFiles.filter((file) => isBankOfx(file));
     if (!bankFiles.length) { setError("Nenhum extrato OFX disponível."); return; }
-    if (!window.confirm("Verificar " + bankFiles.length + " extratos OFX e importar automaticamente apenas movimentações novas? Possíveis duplicidades serão ignoradas. Faça um backup JSON antes de continuar.")) return;
     setSyncing(true);
     setError("");
     setSyncSummary("");
@@ -510,7 +529,7 @@ export default function DriveSettings({ transactions, accounts, categories, onIm
         ) : (
           <button type="button" disabled={!sdkReady || busy} onClick={connect} className="rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white disabled:opacity-50">{busy ? "Aguardando autorização..." : "Conectar Google Drive"}</button>
         )}
-        <p className="text-xs text-[#77879B]">A autorização permite leitura de todo o Drive, não apenas das pastas listadas. Nenhum arquivo será importado nesta etapa.</p>
+        <p className="text-xs text-[#77879B]">A autorização permite leitura de todo o Drive, não apenas das pastas listadas. Após autorizar, os extratos OFX das pastas configuradas serão sincronizados automaticamente. Duplicidades suspeitas irão para revisão.</p>
       </div>
       {connected && <div className="mt-4"><button type="button" disabled={checking} onClick={() => void checkFolders()} className="rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white disabled:opacity-50">{checking ? "Procurando pastas..." : "Localizar pastas no Drive"}</button><p className="mt-2 text-xs text-[#77879B]">Consulta apenas nomes e identificadores de pastas. Não lê nem importa arquivos financeiros.</p></div>}
       {results?.some((item) => item.status === "found") && <div className="mt-4"><button type="button" disabled={checking || loadingFiles} onClick={() => void checkFiles()} className="rounded-xl border border-[#DCE5EF] bg-white/80 px-5 py-3 text-sm font-medium text-[#34383F] disabled:opacity-50">{loadingFiles ? "Verificando arquivos..." : "Verificar arquivos"}</button><p className="mt-2 text-xs text-[#77879B]">Exibe metadados de OFX nas pastas dos bancos e nas subpastas anuais (2026, 2027 etc.), além dos CSV de faturas, sem baixar o conteúdo.</p></div>}
