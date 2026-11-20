@@ -963,7 +963,8 @@ if (amountCents <= 0) {
         {/* ================================== */}
 
         {active === "Visão geral" && (
-          <div className="space-y-5">
+          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
+            <div className="min-w-0 space-y-5">
             <div className="flex flex-wrap gap-3">
               {([["income", "+ Nova receita"], ["expense", "+ Nova despesa"]] as [TransactionType, string][]).map(([type, label]) => (
                 <button key={type} type="button" onClick={() => {
@@ -1015,7 +1016,10 @@ if (amountCents <= 0) {
               </div>
             </div>
 
-            <TopExpenses transactions={transactions} categories={categories} />
+            </div>
+            <div className="min-w-0 xl:sticky xl:top-5">
+              <TopExpenses transactions={transactions} categories={categories} />
+            </div>
           </div>
         )}
 
