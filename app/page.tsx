@@ -1472,20 +1472,6 @@ if (amountCents <= 0) {
                   </div>;
                 })}</div>}
             </div>}
-            {editItem && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm" onClick={() => setEditId(null)}>
-              <div role="dialog" aria-modal="true" aria-label="Classificar lançamento" onClick={(event) => event.stopPropagation()} className="w-full max-w-xl space-y-4 rounded-3xl border border-white bg-[#F8FAFD] p-6 shadow-2xl">
-                <h3 className="text-lg font-semibold text-[#26364D]">Classificar lançamento</h3>
-                <p className="text-xs text-[#64748B]">{displayDate(editItem.date)} · {getTransactionAccountName(editItem)} · {money(editItem.amountCents)}</p>
-                <label className="block space-y-2"><span className="text-xs text-[#64748B]">Descrição exibida (o texto original do extrato será preservado)</span><input value={editDescription} onChange={(event) => setEditDescription(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-3 text-sm" /></label>
-                {editItem.type !== "transfer" && <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="block space-y-2"><span className="text-xs text-[#64748B]">Categoria</span><select value={editCategoryId} onChange={(event) => { setEditCategoryId(event.target.value); setEditSubcategoryId(""); }} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-3 text-sm"><option value="">Selecione</option>{editCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-                  <label className="block space-y-2"><span className="text-xs text-[#64748B]">Subcategoria</span><select value={editSubcategoryId} onChange={(event) => setEditSubcategoryId(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-3 text-sm"><option value="">Selecione</option>{editCategory?.subcategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-                </div>}
-                <label className="block space-y-2"><span className="text-xs text-[#64748B]">Por conta de quem? (opcional)</span><input value={editPaidFor} onChange={(event) => setEditPaidFor(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-3 text-sm" /></label>
-                <p className="text-xs text-[#64748B]">A classificação não altera valor, data, conta ou origem importada. Vamos tratar transferências na próxima etapa.</p>
-                <div className="flex justify-end gap-3"><button type="button" onClick={() => setEditId(null)} className="rounded-xl border border-[#DCE5EF] bg-white px-5 py-3 text-sm">Cancelar</button><button type="button" onClick={saveEdit} className="rounded-xl bg-[#34383F] px-5 py-3 text-sm text-white">Salvar classificação</button></div>
-              </div>
-            </div>}
             {transactionTab === "transfers" && <div className="rounded-3xl border border-white/90 bg-white/65 p-4 shadow-sm backdrop-blur-2xl md:p-5">
               <h3 className="text-sm font-semibold text-[#26364D]">Possíveis transferências entre contas</h3>
               <p className="mt-1 text-xs text-[#64748B]">{transferSuggestions.length} par(es) aguardando sua decisão. Confirme apenas movimentações entre suas próprias contas.</p>
@@ -1567,23 +1553,32 @@ if (amountCents <= 0) {
                     <div className="hidden md:block" />
                   </div>
                   {filteredTransactions.map((transaction) => (
-                    <div key={transaction.id} role="button" tabIndex={0} aria-label={"Editar lançamento: " + (transaction.displayDescription || transaction.description)} onClick={() => startEdit(transaction)} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); startEdit(transaction); } }} className="grid cursor-pointer grid-cols-[80px_minmax(0,1fr)_auto] items-center gap-3 border-b border-[#EDF0F4] py-4 transition-colors hover:bg-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7C9AC3] last:border-0 md:grid-cols-[100px_minmax(180px,2fr)_minmax(140px,1.4fr)_120px_60px]">
-                      <span className="text-xs text-[#64748B]">{displayDate(transaction.date)}</span>
-                      <button type="button" onClick={(event) => { event.stopPropagation(); startEdit(transaction); }} title="Editar descrição exibida e classificação" className="min-w-0 text-left">
-                        <span className="block break-words text-sm font-medium text-[#35445A] hover:text-blue-700">{transaction.displayDescription || transaction.description}</span>
-                        <span className="mt-1 block text-[11px] text-[#94A0AF]">{getTransactionAccountName(transaction)}</span>
-                      </button>
-                      <div className="col-span-2 min-w-0 pl-[92px] md:col-span-1 md:pl-0">
-                        <p className="break-words text-xs font-medium text-[#526B8B]">{getCategoryNames(transaction).group}</p>
-                        <p className="mt-1 break-words text-xs text-[#94A0AF]">{getCategoryNames(transaction).subcategory}</p>
+                    <div key={transaction.id} className={`border-b border-[#EDF0F4] py-3 last:border-0 ${editId === transaction.id ? "rounded-2xl border border-[#A7BBD6] bg-white/80 px-4 shadow-sm" : ""}`}>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <button type="button" aria-expanded={editId === transaction.id} onClick={() => editId === transaction.id ? setEditId(null) : startEdit(transaction)} className="min-w-0 flex-1 text-left">
+                          <p className="break-words text-sm font-medium text-[#35445A]">{transaction.displayDescription || transaction.description}</p>
+                          <p className="mt-1 text-xs text-[#77879B]">{displayDate(transaction.date)} · {getTransactionAccountName(transaction)}</p>
+                          <p className="mt-2 text-xs text-[#64748B]">{transaction.type === "income" ? "Receita" : transaction.type === "expense" ? "Despesa" : "Transferência"} · {getCategoryNames(transaction).group}{getCategoryNames(transaction).subcategory ? " → " + getCategoryNames(transaction).subcategory : ""}</p>
+                        </button>
+                        <div className="flex shrink-0 items-start gap-3">
+                          <button type="button" aria-expanded={editId === transaction.id} aria-label={"Editar " + (transaction.displayDescription || transaction.description)} onClick={() => editId === transaction.id ? setEditId(null) : startEdit(transaction)} className={`text-sm font-semibold ${transaction.type === "income" ? "text-emerald-700" : transaction.type === "expense" ? "text-[#B65D58]" : "text-[#526B8B]"}`}>
+                            {transaction.type === "income" ? "+" : transaction.type === "expense" ? "−" : ""}{money(transaction.amountCents)} <span className="ml-1 text-[#7A8BA4]">{editId === transaction.id ? "⌃" : "⌄"}</span>
+                          </button>
+                          <button type="button" onClick={() => deleteTransaction(transaction.id)} className="text-xs text-[#A0AABA] hover:text-rose-600" title="Excluir lançamento">Excluir</button>
+                        </div>
                       </div>
-                      <p className={`col-start-3 row-start-1 whitespace-nowrap text-right text-sm font-semibold md:col-start-4 ${transaction.type === "income" ? "text-emerald-700" : transaction.type === "expense" ? "text-[#B65D58]" : "text-[#526B8B]"}`}>
-                        {transaction.type === "income" ? "+" : transaction.type === "expense" ? "−" : ""}{money(transaction.amountCents)}
-                      </p>
-                      <button type="button" onClick={(event) => { event.stopPropagation(); deleteTransaction(transaction.id); }} className="col-start-3 text-right text-xs text-[#A0AABA] hover:text-rose-600 md:col-start-5 md:row-start-1" title="Excluir lançamento">Excluir</button>
+                      {editId === transaction.id && editItem && <div className="mt-4 space-y-3 border-t border-[#E5EAF0] pt-4">
+                        <label className="block space-y-1"><span className="text-xs text-[#64748B]">Descrição exibida</span><input value={editDescription} onChange={(event) => setEditDescription(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm" /></label>
+                        {editItem.type !== "transfer" && <div className="grid gap-3 sm:grid-cols-2">
+                          <label className="block space-y-1"><span className="text-xs text-[#64748B]">Categoria</span><select value={editCategoryId} onChange={(event) => {setEditCategoryId(event.target.value);setEditSubcategoryId("");}} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm"><option value="">Não classificada</option>{editCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                          <label className="block space-y-1"><span className="text-xs text-[#64748B]">Subcategoria</span><select disabled={!editCategoryId} value={editSubcategoryId} onChange={(event) => setEditSubcategoryId(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm disabled:opacity-40"><option value="">Não selecionada</option>{editCategory?.subcategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                        </div>}
+                        <label className="block space-y-1"><span className="text-xs text-[#64748B]">Por conta de quem? (opcional)</span><input value={editPaidFor} onChange={(event) => setEditPaidFor(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm" /></label>
+                        <p className="text-xs text-[#77879B]">A edição não altera valor, data, conta nem o texto original do extrato.</p>
+                        <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditId(null)} className="rounded-xl border border-[#DCE5EF] bg-white px-4 py-2 text-xs font-semibold text-[#526B8B]">Cancelar</button><button type="button" onClick={saveEdit} className="rounded-xl bg-[#344D70] px-4 py-2 text-xs font-semibold text-white">Salvar e concluir</button></div>
+                      </div>}
                     </div>
-                  ))}
-                </div>
+                  ))}               </div>
               )}
             </div>
 
