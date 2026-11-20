@@ -21,7 +21,10 @@ function parseBulk(text:string):Array<{line:number;term:string;category:string;s
   return [{line:index+1,term:parts[0]||"",category:parts[1]||"",subcategory:parts[2]||""}];
  });
 }
-export default function DescriptionRules({rules,onChange,categories}:{rules:DescriptionRule[];onChange:(rules:DescriptionRule[])=>void;categories:Category[]}){
+export default function DescriptionRules({rules,onChange,categories,onReclassify}:{rules:DescriptionRule[];onChange:(rules:DescriptionRule[])=>void;categories:Category[];onReclassify:()=>void}){
+ const [editingId,setEditingId]=useState<string|null>(null);
+ const [editCategoryId,setEditCategoryId]=useState("");
+ const [editSubcategoryId,setEditSubcategoryId]=useState("");
  const [term,setTerm]=useState("");
  const [categoryId,setCategoryId]=useState("");
  const [subcategoryId,setSubcategoryId]=useState("");
@@ -100,7 +103,17 @@ export default function DescriptionRules({rules,onChange,categories}:{rules:Desc
   </div>
   <div className="rounded-3xl border border-white/80 bg-white/60 p-5 shadow-sm backdrop-blur-2xl">
    <h4 className="font-semibold text-[#263D59]">Regras cadastradas ({rules.length})</h4>
-   <div className="mt-3 space-y-2">{rules.length?rules.map(rule=>{const cat=categories.find(c=>c.id===rule.categoryId);const sub=cat?.subcategories.find(x=>x.id===rule.subcategoryId);return <div key={rule.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/80 bg-white/60 p-3 text-sm"><div><strong className="text-[#263D59]">{rule.term}</strong><span className="ml-2 text-[#64748B]">→ {cat?.name||"Categoria removida"} / {sub?.name||"Subcategoria removida"}</span></div><button type="button" onClick={()=>onChange(rules.filter(x=>x.id!==rule.id))} className="rounded-lg px-3 py-2 text-rose-700 hover:bg-rose-50">Excluir</button></div>}):<p className="text-sm text-[#64748B]">Nenhuma regra cadastrada ainda.</p>}</div>
+   <div className="mt-3 rounded-xl border border-[#DDE5EE] bg-white/70 p-3">
+     <p className="text-sm text-[#64748B]">Depois de editar as regras, você pode aplicá-las novamente aos lançamentos importados. A operação não altera valores, contas nem transferências internas.</p>
+     <button type="button" onClick={onReclassify} className="mt-2 rounded-xl bg-[#344D70] px-4 py-2 text-sm font-semibold text-white">Reclassificar lançamentos com as regras atuais</button>
+   </div>
+   <div className="mt-3 space-y-2">{rules.length?rules.map(rule=>{const cat=categories.find(c=>c.id===rule.categoryId);const sub=cat?.subcategories.find(x=>x.id===rule.subcategoryId);return <div key={rule.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/80 bg-white/60 p-3 text-sm"><div className="min-w-0 flex-1"><strong className="text-[#263D59]">{rule.term}</strong><span className="ml-2 text-[#64748B]">→ {cat?.name||"Categoria removida"} / {sub?.name||"Subcategoria removida"}</span>
+     {editingId===rule.id&&<div className="mt-3 grid gap-2 sm:grid-cols-2">
+       <label className="text-xs text-[#52627A]">Categoria<select value={editCategoryId} onChange={e=>{setEditCategoryId(e.target.value);setEditSubcategoryId("");}} className="mt-1 w-full rounded-lg border border-[#DDE5EE] bg-white p-2"><option value="">Selecione</option>{categories.filter(c=>c.type!=="transfer").map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+       <label className="text-xs text-[#52627A]">Subcategoria<select value={editSubcategoryId} onChange={e=>setEditSubcategoryId(e.target.value)} className="mt-1 w-full rounded-lg border border-[#DDE5EE] bg-white p-2"><option value="">Selecione</option>{categories.find(c=>c.id===editCategoryId)?.subcategories.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+       <div className="flex gap-2 sm:col-span-2"><button type="button" disabled={!editCategoryId||!editSubcategoryId} onClick={()=>{onChange(rules.map(x=>x.id===rule.id?{...x,categoryId:editCategoryId,subcategoryId:editSubcategoryId}:x));setEditingId(null);}} className="rounded-lg bg-[#344D70] px-3 py-2 text-white disabled:opacity-40">Salvar alteração</button><button type="button" onClick={()=>setEditingId(null)} className="rounded-lg border px-3 py-2">Cancelar</button></div>
+     </div>}
+   </div><div className="flex gap-2"><button type="button" onClick={()=>{setEditingId(rule.id);setEditCategoryId(rule.categoryId);setEditSubcategoryId(rule.subcategoryId);}} className="rounded-lg px-3 py-2 text-[#344D70] hover:bg-slate-100">Editar</button><button type="button" onClick={()=>onChange(rules.filter(x=>x.id!==rule.id))} className="rounded-lg px-3 py-2 text-rose-700 hover:bg-rose-50">Excluir</button></div></div>}):<p className="text-sm text-[#64748B]">Nenhuma regra cadastrada ainda.</p>}</div>
   </div>
  </div>;
 }
