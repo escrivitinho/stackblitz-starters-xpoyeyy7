@@ -8,13 +8,15 @@ type Investment = { awaitingMovements?: boolean; valuations?: Valuation[]; id: s
 const KEY = "moneo-investments-v1";
 const types = ["Caixinha Nubank", "CDB", "Tesouro Direto", "LCI / LCA", "Ações", "FIIs", "ETF", "Fundos", "Criptomoedas", "Outros"];
 
-export default function InvestmentsManager() {
+export default function InvestmentsManager({ accounts }: { accounts: { id: number; name: string }[] }) {
   const [items, setItems] = useState<Investment[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [name, setName] = useState("");
   const [category, setCategory] = useState("CDB");
   const [institution, setInstitution] = useState("");
+  const availableBanks = accounts.filter((account) => account.name.trim());
+  const selectedBank = category === "Caixinha Nubank" ? availableBanks.find((account) => account.name.trim().toLowerCase() === "nubank")?.name ?? "" : institution;
   const [invested, setInvested] = useState("");
   const [current, setCurrent] = useState("");
   const [date, setDate] = useState(() => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); });
@@ -42,10 +44,10 @@ export default function InvestmentsManager() {
     const isCaixinha = category === "Caixinha Nubank";
     const investedCents = isCaixinha ? 0 : parseMoneyToCents(invested);
     const currentCents = isCaixinha ? 0 : parseMoneyToCents(current);
-    if (!name.trim() || investedCents === null || currentCents === null || investedCents < 0 || currentCents < 0 || (!isCaixinha && !date)) {
-      setError("Informe nome, data e valores válidos para cadastrar o investimento."); return;
+    if (!name.trim() || investedCents === null || currentCents === null || investedCents < 0 || currentCents < 0 || (!isCaixinha && !date) || !selectedBank) {
+      setError("Confira o nome, o banco cadastrado e os campos obrigatórios do investimento."); return;
     }
-    setItems((previous) => [{ id: crypto.randomUUID(), name: name.trim(), category, institution: isCaixinha ? "Nubank" : institution.trim(), investedCents, currentCents, date, awaitingMovements: isCaixinha, valuations: isCaixinha ? [] : [{ id: crypto.randomUUID(), date, valueCents: currentCents }] }, ...previous]);
+    setItems((previous) => [{ id: crypto.randomUUID(), name: name.trim(), category, institution: selectedBank, investedCents, currentCents, date, awaitingMovements: isCaixinha, valuations: isCaixinha ? [] : [{ id: crypto.randomUUID(), date, valueCents: currentCents }] }, ...previous]);
     setName(""); setInstitution(""); setInvested(""); setCurrent(""); setError(""); setAttemptedSave(false); setFormOpen(false);
   }
   function updateValue(item: Investment) {
@@ -77,8 +79,8 @@ export default function InvestmentsManager() {
       <h3 className="mb-4 font-semibold text-[#26364D]">Cadastrar investimento ou Caixinha</h3>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="space-y-1 text-xs text-[#64748B]">Nome do ativo<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: CDB liquidez diária" className={`block w-full rounded-xl border border-white bg-white/75 p-3 text-sm text-[#26364D] outline-none focus:border-blue-300 ${attemptedSave && (!name.trim()) ? invalidStyle : ""}`} /></label>
-        <label className="space-y-1 text-xs text-[#64748B]">Tipo<select value={category} onChange={(e) => { setCategory(e.target.value); if (e.target.value === "Caixinha Nubank") setInstitution("Nubank"); }} className="block w-full rounded-xl border border-white bg-white/75 p-3 text-sm text-[#26364D]">{types.map((type) => <option key={type}>{type}</option>)}</select></label>
-        <label className="space-y-1 text-xs text-[#64748B]">Instituição<input value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="Ex.: Nubank" className="block w-full rounded-xl border border-white bg-white/75 p-3 text-sm text-[#26364D]" /></label>
+        <label className="space-y-1 text-xs text-[#64748B]">Tipo<select value={category} onChange={(e) => { setCategory(e.target.value); if (e.target.value === "Caixinha Nubank") setInstitution(""); }} className="block w-full rounded-xl border border-white bg-white/75 p-3 text-sm text-[#26364D]">{types.map((type) => <option key={type}>{type}</option>)}</select></label>
+        <label className="space-y-1 text-xs text-[#64748B]">Banco<select value={selectedBank} disabled={category === "Caixinha Nubank"} onChange={(e) => setInstitution(e.target.value)} className={`block w-full rounded-xl border border-white bg-white/75 p-3 text-sm text-[#26364D] disabled:opacity-70 ${attemptedSave && !selectedBank ? invalidStyle : ""}`}><option value="">Selecione um banco cadastrado</option>{availableBanks.map((account) => <option key={account.id} value={account.name}>{account.name}</option>)}</select>{category === "Caixinha Nubank" && !selectedBank && <span className="block text-xs text-rose-700">Cadastre uma conta Nubank em Contas para criar esta Caixinha.</span>}</label>
         {category !== "Caixinha Nubank" && <label className="space-y-1 text-xs text-[#64748B]">Data da aplicação<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`block w-full rounded-xl border border-white bg-white/75 p-3 text-sm text-[#26364D] ${attemptedSave && (category !== "Caixinha Nubank" && !date) ? invalidStyle : ""}`} /></label>}
         {category !== "Caixinha Nubank" && <label className="space-y-1 text-xs text-[#64748B]">Valor aplicado (R$)<input value={invested} onChange={(e) => setInvested(e.target.value)} placeholder="0,00" inputMode="decimal" className={`block w-full rounded-xl border border-white bg-white/75 p-3 text-sm text-[#26364D] ${attemptedSave && (parseMoneyToCents(invested) === null || parseMoneyToCents(invested)! < 0) ? invalidStyle : ""}`} /></label>}
         {category !== "Caixinha Nubank" && <label className="space-y-1 text-xs text-[#64748B]">Valor atual (R$)<input value={current} onChange={(e) => setCurrent(e.target.value)} placeholder="0,00" inputMode="decimal" className={`block w-full rounded-xl border border-white bg-white/75 p-3 text-sm text-[#26364D] ${attemptedSave && (parseMoneyToCents(current) === null || parseMoneyToCents(current)! < 0) ? invalidStyle : ""}`} /></label>}
