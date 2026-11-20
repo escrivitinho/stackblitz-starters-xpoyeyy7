@@ -1093,17 +1093,17 @@ if (amountCents <= 0) {
               <div className="group relative isolate overflow-hidden rounded-3xl border border-white/90 bg-white/65 p-6 shadow-[0_8px_32px_rgba(100,90,150,0.10)] backdrop-blur-2xl">
                 <div className="pointer-events-none absolute -right-10 -top-16 -z-10 h-48 w-48 rounded-full bg-violet-200/70 blur-[65px]" />
                 <p className="text-sm font-medium text-[#756D91]">Dinheiro investido</p>
-                <h3 className="mt-7 text-3xl font-semibold text-[#40385F]">R$ 18.610,00</h3>
-                <p className="mt-2 text-xs text-[#938BAA]">Valor alocado em investimentos</p>
+                <h3 className="mt-7 text-3xl font-semibold text-[#40385F]">{money(0)}</h3>
+                <p className="mt-2 text-xs text-[#938BAA]">Investimentos ainda não cadastrados</p>
               </div>
             </div>
 
             <div className="relative isolate overflow-hidden rounded-3xl border border-white/90 bg-white/55 px-6 py-5 shadow-[0_8px_32px_rgba(80,110,150,0.08)] backdrop-blur-2xl">
               <p className="text-sm text-[#77879B]">Patrimônio total</p>
               <h3 className="mt-2 text-2xl font-semibold text-[#263D59]">
-                {money(totalBalanceCents + 1861000)}
+                {money(totalBalanceCents)}
               </h3>
-              <p className="mt-1 text-xs text-[#8B9AAD]">Disponível + investido · investimento demonstrativo</p>
+              <p className="mt-1 text-xs text-[#8B9AAD]">Saldo disponível · investimentos ainda não cadastrados</p>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
