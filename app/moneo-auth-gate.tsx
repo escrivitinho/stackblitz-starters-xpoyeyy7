@@ -42,7 +42,7 @@ export default function MoneoAuthGate({ children }: { children: ReactNode }) {
           throw new Error("O e-mail do usuário ainda não foi confirmado no Supabase. Confirme-o em Authentication → Users.");
         }
         if (response.status === 429) throw new Error("Muitas tentativas de login. Aguarde alguns minutos antes de tentar novamente.");
-        throw new Error("Falha de autenticação no Supabase (" + response.status + (code ? ", " + code : "") + "). Confira a URL, a chave pública e o estado do serviço.");
+        throw new Error("O Supabase recusou o login (HTTP " + response.status + "). " + (code ? "Código: " + code + ". " : "") + (message ? "Detalhe: " + message.slice(0, 240) : "Confira a configuração de autenticação em Authentication → Users e Logs."));
       }
       // O usuário precisa estar explicitamente cadastrado em moneo_owner.
       const ownerResponse = await fetch(url + "/rest/v1/rpc/is_moneo_owner", {
