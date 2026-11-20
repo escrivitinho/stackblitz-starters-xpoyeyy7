@@ -1015,22 +1015,33 @@ if (amountCents <= 0) {
 
         <nav className="flex flex-wrap gap-1 md:flex-col">
           {navigation.map((item) => (
-            <button
-              key={item.name}
-              onClick={() => item.name === "Lançamentos" ? setLaunchMenuOpen((open) => !open) : goToPage(item.name)}
-              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
-                (active === item.name || (item.name === "Lançamentos" && active.startsWith("Lançamentos ·")))
-                  ? "bg-white/80 font-medium text-[#25282D] shadow-sm ring-1 ring-white/80"
-                  : "text-[#707780] hover:bg-white/60 hover:text-[#25282D]"
-              }`}
-            >
-              <span className="text-lg">{item.icon}</span>
-              {item.name}
-            </button>
+            <div key={item.name} className="flex w-full flex-col">
+              <button
+                type="button"
+                aria-expanded={item.name === "Lançamentos" ? launchMenuOpen : undefined}
+                onClick={() => item.name === "Lançamentos" ? setLaunchMenuOpen((open) => !open) : goToPage(item.name)}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
+                  (active === item.name || (item.name === "Lançamentos" && active.startsWith("Lançamentos ·")))
+                    ? "bg-white/80 font-medium text-[#25282D] shadow-sm ring-1 ring-white/80"
+                    : "text-[#707780] hover:bg-white/60 hover:text-[#25282D]"
+                }`}
+              >
+                <span className="text-lg">{item.icon}</span>
+                <span className="flex-1">{item.name}</span>
+                {item.name === "Lançamentos" && <span className="text-xs text-[#77879B]">{launchMenuOpen ? "⌃" : "⌄"}</span>}
+              </button>
+              {item.name === "Lançamentos" && launchMenuOpen && (
+                <div className="ml-5 mt-1 flex flex-col gap-1 rounded-2xl border border-white/70 bg-white/40 p-2">
+                  {[{ name: "Extratos", page: "Lançamentos · Extratos", icon: "▤" }, { name: "Cartões", page: "Lançamentos · Cartões", icon: "▣" }].map((subitem) => (
+                    <button key={subitem.page} type="button" onClick={() => goToPage(subitem.page)}
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${active === subitem.page ? "bg-white/85 font-semibold text-[#263D59] shadow-sm" : "text-[#707780] hover:bg-white/70"}`}>
+                      <span>{subitem.icon}</span>{subitem.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
-          {launchMenuOpen && <div className="flex flex-col gap-1 rounded-2xl border border-white/70 bg-white/40 p-2 md:ml-5">
-            {[{ name: "Extratos", page: "Lançamentos · Extratos", icon: "▤" }, { name: "Cartões", page: "Lançamentos · Cartões", icon: "▣" }].map((item) => <button key={item.page} type="button" onClick={() => goToPage(item.page)} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${active === item.page ? "bg-white/85 font-semibold text-[#263D59] shadow-sm" : "text-[#707780] hover:bg-white/70"}`}><span>{item.icon}</span>{item.name}</button>)}
-          </div>}
         </nav>
 
         <div className="mt-8 hidden rounded-2xl border border-white/60 bg-white/55 p-4 md:block">
