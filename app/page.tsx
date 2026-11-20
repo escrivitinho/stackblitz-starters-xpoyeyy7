@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import CategoriesManager, { type Category } from "./categories-manager";
 import CardsManager, { type CardEntry } from "./cards-manager";
 import DriveSettings from "./drive-settings";
+import InvestmentsManager from "./investments-manager";
 import { formatCents, parseMoneyToCents } from "./lib/money";
 import {
   calculateTransactionTotals,
@@ -89,6 +90,7 @@ const navigation = [
   { name: "Categorias", icon: "⌁" },
   { name: "Contas", icon: "▤" },
   { name: "Cartões", icon: "▣" },
+  { name: "Investimentos", icon: "◈" },
   { name: "Orçamento", icon: "◷" },
   { name: "Relatórios", icon: "▥" },
 ];
@@ -1734,6 +1736,8 @@ if (amountCents <= 0) {
         {/* ================================== */}
         {/* OUTROS MÓDULOS */}
         {/* ================================== */}
+
+        {active === "Investimentos" && <InvestmentsManager />}
 
         {active === "Cartões" && (
           <CardsManager entries={cardEntries} onChange={setCardEntries} categories={categories} />
