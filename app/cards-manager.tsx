@@ -81,7 +81,7 @@ function parseAmount(raw: string): number {
   return cents;
 }
 
-function parseNubankCsv(text: string): Draft[] {
+export function parseNubankCsv(text: string): Draft[] {
   const rows = parseCsv(text);
   const header = rows.shift()?.map((cell) => cell.trim().toLowerCase());
   if (!header) throw new Error("Arquivo vazio.");
