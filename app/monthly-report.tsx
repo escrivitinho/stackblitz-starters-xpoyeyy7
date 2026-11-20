@@ -1,36 +1,45 @@
 "use client";
 import { useMemo, useState } from "react";
 import type { Transaction } from "./transactions";
+import type { Category } from "./categories-manager";
 import { formatCents } from "./lib/money";
 
 const monthNames=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 const money=(n:number)=>formatCents(n);
-export default function MonthlyReport({transactions}:{transactions:Transaction[]}){
+export default function MonthlyReport({transactions,categories}:{transactions:Transaction[];categories:Category[]}){
  const years=useMemo(()=>Array.from(new Set(transactions.filter(t=>/^\d{4}-\d{2}-\d{2}$/.test(t.date)).map(t=>Number(t.date.slice(0,4))))).sort((a,b)=>b-a),[transactions]);
  const [selectedYear,setSelectedYear]=useState<number|null>(null);
  const [reportTab,setReportTab]=useState<"charts"|"analytic"|"monthly">("charts");
  const year=selectedYear!==null&&years.includes(selectedYear)?selectedYear:(years[0]??new Date().getFullYear());
+ const classified=useMemo(()=>transactions.map(t=>{
+  const category=categories.find(c=>c.id===t.categoryId) || categories.find(c=>c.name===t.group && (c.type===t.type || c.type==="expense" && t.type==="income"));
+  const type=category?.type==="expense"||category?.type==="income"?category.type:t.type;
+  const direction=t.type==="income"?1:t.type==="expense"?-1:0;
+  const signedAmount=type==="income"?direction*t.amountCents:-direction*t.amountCents;
+  const subcategory=category?.subcategories.find(sub=>sub.id===t.subcategoryId)?.name || t.subcategory;
+  return {transaction:t,type,signedAmount,group:category?.name||t.group,subcategory};
+ }),[transactions,categories]);
  const monthly=useMemo(()=>Array.from({length:12},(_,index)=>{
   const prefix=year+"-"+String(index+1).padStart(2,"0");
-  const items=transactions.filter(t=>t.date.startsWith(prefix)&&!t.internalTransferPairId&&t.type!=="transfer");
-  const income=items.filter(t=>t.type==="income").reduce((sum,t)=>sum+t.amountCents,0);
-  const expense=items.filter(t=>t.type==="expense").reduce((sum,t)=>sum+t.amountCents,0);
+  const items=classified.filter(({transaction:t})=>t.date.startsWith(prefix)&&!t.internalTransferPairId&&t.type!=="transfer");
+  const income=items.filter(t=>t.type==="income").reduce((sum,t)=>sum+t.signedAmount,0);
+  const expense=items.filter(t=>t.type==="expense").reduce((sum,t)=>sum+t.signedAmount,0);
   return {month:monthNames[index],income,expense,balance:income-expense,count:items.length};
- }),[transactions,year]);
+ }),[classified,year]);
  const categoryRows=useMemo(()=>{
-  const data=transactions.filter(t=>t.date.startsWith(String(year)+"-")&&!t.internalTransferPairId&&t.type!=="transfer");
+  const data=classified.filter(({transaction:t})=>t.date.startsWith(String(year)+"-")&&!t.internalTransferPairId&&t.type!=="transfer");
   return (["income","expense"] as const).map(type=>{
    const rows=new Map<string,{name:string;months:number[];subs:Map<string,number[]>}>();
    for(const t of data.filter(x=>x.type===type)){
-    const month=Number(t.date.slice(5,7))-1;
+    const month=Number(t.transaction.date.slice(5,7))-1;
     if(month<0||month>11)continue;
     const category=(t.group||"Sem categoria").trim()||"Sem categoria";
     const sub=(t.subcategory||"Sem subcategoria").trim()||"Sem subcategoria";
     if(!rows.has(category))rows.set(category,{name:category,months:Array(12).fill(0),subs:new Map()});
     const row=rows.get(category)!;
-    row.months[month]+=t.amountCents;
+    row.months[month]+=t.signedAmount;
     if(!row.subs.has(sub))row.subs.set(sub,Array(12).fill(0));
-    row.subs.get(sub)![month]+=t.amountCents;
+    row.subs.get(sub)![month]+=t.signedAmount;
    }
    return {type,rows:Array.from(rows.values()).sort((a,b)=>a.name.localeCompare(b.name,"pt-BR"))};
   });
