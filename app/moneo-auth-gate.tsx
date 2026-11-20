@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import MigrationBackup from "./migration-backup";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+const AuthTokenContext = createContext("");
+export function useMoneoToken() { return useContext(AuthTokenContext); }
 
 type AuthState = "loading" | "signed-out" | "authorized" | "unconfigured";
 
@@ -61,7 +64,7 @@ export default function MoneoAuthGate({ children }: { children: ReactNode }) {
     window.location.assign(destination.toString());
   }
 
-  if (state === "authorized") return <><MigrationBackup token={accessToken} />{children}</>;
+  if (state === "authorized") return <AuthTokenContext.Provider value={accessToken}><MigrationBackup token={accessToken} />{children}</AuthTokenContext.Provider>;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#EDF3FA] via-[#F8FAFD] to-[#E7EFF9] px-5 py-10 text-[#263D59]">
