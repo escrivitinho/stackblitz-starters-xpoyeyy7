@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatCents } from "./lib/money";
 import type { Category } from "./categories-manager";
 
@@ -101,7 +101,7 @@ function parseNubankCsv(text: string): Draft[] {
   });
 }
 
-export default function CardsManager({ entries, onChange, categories, importOnly = false }: { entries: CardEntry[]; onChange: (entries: CardEntry[]) => void; categories: Category[]; importOnly?: boolean }) {
+export default function CardsManager({ entries, onChange, categories, importOnly = false, driveFile }: { entries: CardEntry[]; onChange: (entries: CardEntry[]) => void; categories: Category[]; importOnly?: boolean; driveFile?: File | null }) {
   const [openedCard, setOpenedCard] = useState<CardEntry["card"] | null>(null);
   const [openedInvoice, setOpenedInvoice] = useState<string | null>(null);
   const [manualCard, setManualCard] = useState<CardEntry["card"]>("Nubank Crédito");
@@ -163,6 +163,10 @@ export default function CardsManager({ entries, onChange, categories, importOnly
       setPreview(parsed); setFileName(file.name);
     } catch (e) { setError(e instanceof Error ? e.message : "Não foi possível ler o CSV."); }
   }
+  useEffect(()=>{
+    if(driveFile)void loadFile(driveFile);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[driveFile]);
   function confirmImport() {
     if (!newEntries.length) return;
     onChange([...entries, ...newEntries.map((entry) => ({ ...entry, id: crypto.randomUUID() }))]);
