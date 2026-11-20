@@ -1,9 +1,9 @@
 
 "use client";
 
-import MoneoAuthGate from "./moneo-auth-gate";
+import MoneoAuthGate, { useMoneoToken } from "./moneo-auth-gate";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CategoriesManager, { type Category } from "./categories-manager";
 import CardsManager, { type CardEntry } from "./cards-manager";
 import DriveSettings from "./drive-settings";
@@ -190,6 +190,13 @@ function displayDate(date: string) {
 }
 
 function Home() {
+  const cloudToken = useMoneoToken();
+  const [cloudError, setCloudError] = useState("");
+  const [cloudStatus, setCloudStatus] = useState("Conectando ao banco online…");
+  const cloudRevision = useRef<number | null>(null);
+  const cloudSaving = useRef(false);
+  const cloudQueued = useRef<string | null>(null);
+  const cloudBlocked = useRef(false);
   const [active, setActive] = useState("Visão geral");
 
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
@@ -298,51 +305,84 @@ function Home() {
     setEditId(null);
   }
 
-  // Persistência local: carregar após a hidratação e só salvar depois da leitura.
+  // Fonte principal: Supabase. Nenhuma leitura ou gravação automática em localStorage.
   const [storageLoaded, setStorageLoaded] = useState(false);
   const [backupMessage, setBackupMessage] = useState("");
   const [backupError, setBackupError] = useState("");
-
+  const cloudUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\\/$/, "");
+  const cloudKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const cloudHeaders = { apikey: cloudKey || "", Authorization: "Bearer " + cloudToken };
   useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem("moneo-finance-v1");
-      if (saved) {
-        const data: unknown = JSON.parse(saved);
-        if (data && typeof data === "object") {
-          const stored = data as Record<string, unknown>;
-          if (Array.isArray(stored.descriptionRules)) setDescriptionRules(stored.descriptionRules as DescriptionRule[]);
-          if (Array.isArray(stored.accounts)) setAccounts(stored.accounts as Account[]);
-          if (Array.isArray(stored.cardEntries)) setCardEntries(stored.cardEntries as CardEntry[]);
-          if (Array.isArray(stored.pendingTransactions)) setPendingTransactions(stored.pendingTransactions as Transaction[]);
-           if (Array.isArray(stored.rejectedTransferPairs)) setRejectedTransferPairs(stored.rejectedTransferPairs as string[]);
-          const loadedCategories = mergeExcelCategories(Array.isArray(stored.categories)
-            ? normalizeCategories(stored.categories as Category[])
-            : initialCategories);
-          setCategories(loadedCategories);
-          if (Array.isArray(stored.transactions)) {
-            setTransactions(migrateTransactions(stored.transactions as Transaction[], loadedCategories).map(item => classifyExcelTransaction(item, loadedCategories)));
-          }
-        }
+    if (!cloudToken || !cloudUrl || !cloudKey) return;
+    let cancelled = false;
+    async function load() {
+      try {
+        const response = await fetch(cloudUrl + "/rest/v1/moneo_app_state?select=payload,revision", {headers:cloudHeaders,cache:"no-store"});
+        if (!response.ok) throw new Error("Falha ao carregar estado online (HTTP "+response.status+").");
+        const rows = await response.json();
+        if (cancelled) return;
+        if (rows.length !== 1) throw new Error("Estado online não inicializado. Use o botão de preparação do backup antes de continuar.");
+        const stored = rows[0].payload as Record<string,unknown>;
+        if (!stored || typeof stored !== "object" || !Array.isArray(stored.accounts) || !Array.isArray(stored.transactions) || !Array.isArray(stored.categories))
+          throw new Error("Estado online incompleto. Nenhuma alteração foi feita.");
+        const loadedCategories = mergeExcelCategories(normalizeCategories(stored.categories as Category[]));
+        setAccounts(stored.accounts as Account[]);
+        setCategories(loadedCategories);
+        setTransactions(migrateTransactions(stored.transactions as Transaction[],loadedCategories));
+        setDescriptionRules(Array.isArray(stored.descriptionRules) ? stored.descriptionRules as DescriptionRule[] : []);
+        setCardEntries(Array.isArray(stored.cardEntries) ? stored.cardEntries as CardEntry[] : []);
+        setPendingTransactions(Array.isArray(stored.pendingTransactions) ? stored.pendingTransactions as Transaction[] : []);
+        setRejectedTransferPairs(Array.isArray(stored.rejectedTransferPairs) ? stored.rejectedTransferPairs as string[] : []);
+        cloudRevision.current=rows[0].revision;
+        setCloudStatus("Dados carregados do Supabase");
+        setStorageLoaded(true);
+      } catch(e) {
+        if (!cancelled) { cloudBlocked.current=true;setCloudError(e instanceof Error?e.message:"Não foi possível carregar dados online.");setCloudStatus("Conexão interrompida"); }
       }
-    } catch (error) {
-      console.error("Não foi possível carregar os dados locais do MONEO.", error);
-    } finally {
-      setStorageLoaded(true);
     }
-  }, []);
+    void load();
+    return ()=>{cancelled=true;};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[cloudToken]);
 
-  useEffect(() => {
-    if (!storageLoaded) return;
-    try {
-      window.localStorage.setItem(
-        "moneo-finance-v1",
-        JSON.stringify({ accounts, transactions, categories, descriptionRules, cardEntries, pendingTransactions, rejectedTransferPairs })
-      );
-    } catch (error) {
-      console.error("Não foi possível salvar os dados locais do MONEO.", error);
+  const cloudPayload = JSON.stringify({accounts,transactions,categories,descriptionRules,cardEntries,pendingTransactions,rejectedTransferPairs});
+  const lastPayload = useRef<string | null>(null);
+  useEffect(()=>{
+    if (!storageLoaded || cloudBlocked.current || !cloudUrl || !cloudKey || cloudRevision.current===null) return;
+    // A carga inicial não deve disparar gravação.
+    if(lastPayload.current===null){lastPayload.current=cloudPayload;return;}
+    if(lastPayload.current===cloudPayload)return;
+    lastPayload.current=cloudPayload;
+    cloudQueued.current=cloudPayload;
+    const timer=window.setTimeout(()=>{void flush();},600);
+    return ()=>window.clearTimeout(timer);
+    async function flush(){
+      if(cloudSaving.current||cloudBlocked.current)return;
+      cloudSaving.current=true;
+      try{
+        while(cloudQueued.current && !cloudBlocked.current){
+          const payload=cloudQueued.current;
+          cloudQueued.current=null;
+          setCloudStatus("Salvando no Supabase…");
+          const response=await fetch(cloudUrl!+"/rest/v1/rpc/moneo_save_app_state",{
+            method:"POST",headers:{apikey:cloudKey!,Authorization:"Bearer "+cloudToken,"Content-Type":"application/json"},
+            body:JSON.stringify({p_expected_revision:cloudRevision.current,p_payload:JSON.parse(payload)})
+          });
+          if(!response.ok){
+            const details=await response.json().catch(()=>({}));
+            throw new Error("Alterações não confirmadas no banco (HTTP "+response.status+"). "+(details.message||""));
+          }
+          cloudRevision.current=await response.json() as number;
+          setCloudStatus("Salvo no Supabase");
+        }
+      }catch(e){
+        cloudBlocked.current=true;
+        setCloudStatus("Erro ao salvar");
+        setCloudError((e instanceof Error?e.message:"Falha ao salvar")+". Não continue editando; preserve esta aba e recarregue somente após conferir os dados.");
+      }finally{cloudSaving.current=false;}
     }
-  }, [accounts, transactions, categories, descriptionRules, cardEntries, pendingTransactions, rejectedTransferPairs, storageLoaded]);
-
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[cloudPayload,storageLoaded]);
 
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId) ?? null;
