@@ -194,6 +194,14 @@ function Home() {
   const signOut = useMoneoSignOut();
   const [cloudError, setCloudError] = useState("");
   const [cloudStatus, setCloudStatus] = useState("Conectando ao banco online…");
+  const [showCloudStatus, setShowCloudStatus] = useState(true);
+  useEffect(() => {
+    setShowCloudStatus(true);
+    if (cloudStatus === "Salvo no Supabase" || cloudStatus === "Dados carregados do Supabase") {
+      const timer = window.setTimeout(() => setShowCloudStatus(false), 3500);
+      return () => window.clearTimeout(timer);
+    }
+  }, [cloudStatus]);
   const cloudRevision = useRef<number | null>(null);
   const cloudSaving = useRef(false);
   const cloudQueued = useRef<string | null>(null);
@@ -956,7 +964,7 @@ if (amountCents <= 0) {
   return (
     <main className="moneo-app min-h-screen bg-[#F5F5F7] text-[#202B3C] md:flex">
 
-      <div role="status" className="fixed bottom-3 right-3 z-50 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-md">{cloudStatus}</div>
+      {showCloudStatus && <div role="status" className="fixed bottom-3 right-3 z-50 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-md">{cloudStatus}</div>}
       {/* MENU LATERAL */}
       <aside className="moneo-sidebar flex w-full flex-col bg-white/55 px-5 py-6 text-[#34383F] md:fixed md:inset-y-0 md:h-dvh md:w-[250px] md:overflow-y-auto md:overscroll-contain">
         <div className="mb-10 flex items-center gap-3 px-2">
