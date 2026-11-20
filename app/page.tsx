@@ -1898,7 +1898,7 @@ if (amountCents <= 0) {
             <p className="mt-2 text-sm text-[#64748B]">Gerencie extratos bancários e faturas de cartão em um único lugar. Google Drive é a fonte principal; o envio manual é uma alternativa.</p>
           </div>
         </div>}
-        {active === "Central de Importações" && <DriveSettings transactions={transactions} accounts={accounts} categories={categories} onImport={(items) => setTransactions((current) => [...current, ...items.map(item => classifyExcelTransaction(item, categories))])} onCardCsv={setDriveCardFile} onPending={(items) => setPendingTransactions((current) => { const known = new Set(current.map((t) => t.importHash)); return [...current, ...items.filter((item) => !known.has(item.importHash))]; })} />}
+        {active === "Central de Importações" && <DriveSettings transactions={transactions} accounts={accounts} categories={categories} onImport={(items) => setTransactions((current) => [...current, ...items.map(item => classifyExcelTransaction(item, categories))])} onCardCsv={setDriveCardFile} cardEntries={cardEntries} onCardImport={(items)=>setCardEntries(current=>[...current,...items.filter(item=>!current.some(entry=>entry.importKey===item.importKey))])} onPending={(items) => setPendingTransactions((current) => { const known = new Set(current.map((t) => t.importHash)); return [...current, ...items.filter((item) => !known.has(item.importHash))]; })} />}
         {active === "Central de Importações" && <CardsManager entries={cardEntries} onChange={setCardEntries} categories={categories} importOnly driveFile={driveCardFile} />}
         {active === "Categorias" && (
           <div className="space-y-5">
