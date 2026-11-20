@@ -40,7 +40,7 @@ export default function ClassificationPreview({ transactions, categories, onAppl
  const { proposals, skipped } = useMemo(() => {
   const proposals: Proposal[] = []; let skipped = 0;
   for (const transaction of transactions) {
-   if (transaction.type === "transfer" || transaction.internalTransferPairId || transaction.categoryId || transaction.subcategoryId) continue;
+   if (transaction.source === "manual" || transaction.type === "transfer" || transaction.internalTransferPairId || transaction.categoryId || transaction.subcategoryId) continue;
    const matches = source.filter(([word, , , type]) => type === transaction.type && normalize(transaction.description).includes(normalize(word)));
    if (!matches.length) continue;
    const destinations = new Set(matches.map(([,cat,sub]) => normalize(cat)+"|"+normalize(sub)));
