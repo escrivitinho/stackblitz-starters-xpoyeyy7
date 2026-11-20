@@ -7,6 +7,7 @@ import CardsManager, { type CardEntry } from "./cards-manager";
 import DriveSettings from "./drive-settings";
 import InvestmentsManager from "./investments-manager";
 import MonthlyReport from "./monthly-report";
+import DescriptionRules, {matchDescriptionRule, type DescriptionRule} from "./description-rules";
 import TopExpenses from "./top-expenses";
 import ClassificationPreview, { excelRules } from "./classification-preview";
 import ExcelReclassification from "./excel-reclassification";
@@ -193,6 +194,8 @@ export default function Home() {
   const [transactions, setTransactions] =
     useState<Transaction[]>(initialTransactions);
   const [categories, setCategories] = useState<Category[]>(mergeExcelCategories(initialCategories));
+  const [descriptionRules,setDescriptionRules]=useState<DescriptionRule[]>([]);
+  const [categoryScreen,setCategoryScreen]=useState<"categories"|"rules">("categories");
   const [cardEntries, setCardEntries] = useState<CardEntry[]>([]);
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
   const [transactionTab, setTransactionTab] = useState<"all" | "pending" | "transfers">("all");
@@ -287,6 +290,7 @@ export default function Home() {
         const data: unknown = JSON.parse(saved);
         if (data && typeof data === "object") {
           const stored = data as Record<string, unknown>;
+          if (Array.isArray(stored.descriptionRules)) setDescriptionRules(stored.descriptionRules as DescriptionRule[]);
           if (Array.isArray(stored.accounts)) setAccounts(stored.accounts as Account[]);
           if (Array.isArray(stored.cardEntries)) setCardEntries(stored.cardEntries as CardEntry[]);
           if (Array.isArray(stored.pendingTransactions)) setPendingTransactions(stored.pendingTransactions as Transaction[]);
@@ -312,12 +316,12 @@ export default function Home() {
     try {
       window.localStorage.setItem(
         "moneo-finance-v1",
-        JSON.stringify({ accounts, transactions, categories, cardEntries, pendingTransactions, rejectedTransferPairs })
+        JSON.stringify({ accounts, transactions, categories, descriptionRules, cardEntries, pendingTransactions, rejectedTransferPairs })
       );
     } catch (error) {
       console.error("Não foi possível salvar os dados locais do MONEO.", error);
     }
-  }, [accounts, transactions, categories, cardEntries, pendingTransactions, rejectedTransferPairs, storageLoaded]);
+  }, [accounts, transactions, categories, descriptionRules, cardEntries, pendingTransactions, rejectedTransferPairs, storageLoaded]);
 
 
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
@@ -1159,7 +1163,18 @@ if (amountCents <= 0) {
                     <span className="text-xs font-medium text-[#64748B]">Descrição</span>
                     <input
                       value={transactionDescription}
-                      onChange={(e) => setTransactionDescription(e.target.value)}
+                      onChange={(e) => {
+                        const description=e.target.value;
+                        setTransactionDescription(description);
+                        const rule=matchDescriptionRule(description,descriptionRules,categories);
+                        const category=categories.find(c=>c.id===rule?.categoryId);
+                        const subcategory=category?.subcategories.find(sub=>sub.id===rule?.subcategoryId);
+                        if(category&&subcategory){
+                          setTransactionType(category.type);
+                          setTransactionGroup(category.name);
+                          setTransactionSubcategory(subcategory.name);
+                        }
+                      }}
                       placeholder="Ex.: Supermercado"
                       className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF]"
                     />
@@ -1774,12 +1789,13 @@ if (amountCents <= 0) {
         )}
 
         {active === "Categorias" && (
-          <CategoriesManager
-            categories={categories}
-            onChange={setCategories}
-            usedCategoryIds={transactions.map((transaction) => transaction.categoryId).filter((id): id is string => Boolean(id))}
-            usedSubcategoryIds={transactions.map((transaction) => transaction.subcategoryId).filter((id): id is string => Boolean(id))}
-          />
+          <div className="space-y-5">
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={()=>setCategoryScreen("categories")} className={`rounded-xl px-5 py-3 text-sm font-semibold ${categoryScreen==="categories"?"bg-white/90 text-[#263D59] shadow-sm":"bg-white/40 text-[#64748B]"}`}>Categorias e subcategorias</button>
+              <button type="button" onClick={()=>setCategoryScreen("rules")} className={`rounded-xl px-5 py-3 text-sm font-semibold ${categoryScreen==="rules"?"bg-white/90 text-[#263D59] shadow-sm":"bg-white/40 text-[#64748B]"}`}>Classificação por descrição</button>
+            </div>
+            {categoryScreen==="categories"?<CategoriesManager categories={categories} onChange={setCategories} usedCategoryIds={transactions.map(t=>t.categoryId).filter((id):id is string=>Boolean(id))} usedSubcategoryIds={transactions.map(t=>t.subcategoryId).filter((id):id is string=>Boolean(id))}/>:<DescriptionRules rules={descriptionRules} onChange={setDescriptionRules} categories={categories}/>}
+          </div>
         )}
 
         {active === "Relatórios" && <MonthlyReport transactions={transactions} categories={categories} />}
