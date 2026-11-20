@@ -309,7 +309,7 @@ function Home() {
   const [storageLoaded, setStorageLoaded] = useState(false);
   const [backupMessage, setBackupMessage] = useState("");
   const [backupError, setBackupError] = useState("");
-  const cloudUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\\/$/, "");
+  const cloudUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
   const cloudKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   const cloudHeaders = { apikey: cloudKey || "", Authorization: "Bearer " + cloudToken };
   useEffect(() => {
@@ -942,9 +942,20 @@ if (amountCents <= 0) {
     accountTransactions
   );
 
+  if (!storageLoaded || cloudBlocked.current) {
+    return <main className="min-h-screen bg-[#F5F5F7] p-8 text-[#263D59]">
+      <div className="mx-auto max-w-xl rounded-2xl bg-white p-8 shadow-sm">
+        <h1 className="text-xl font-semibold">MONEO · Armazenamento online</h1>
+        <p className="mt-3 text-sm">{cloudError || cloudStatus}</p>
+        <p className="mt-3 text-sm text-slate-500">Se o banco ainda não foi inicializado, utilize a ferramenta de migração acima. Nenhum dado local será apagado.</p>
+      </div>
+    </main>;
+  }
+
   return (
     <main className="moneo-app min-h-screen bg-[#F5F5F7] text-[#202B3C] md:flex">
 
+      <div role="status" className="fixed bottom-3 right-3 z-50 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-md">{cloudStatus}</div>
       {/* MENU LATERAL */}
       <aside className="moneo-sidebar flex w-full flex-col bg-white/55 px-5 py-6 text-[#34383F] md:fixed md:inset-y-0 md:h-dvh md:w-[250px] md:overflow-y-auto md:overscroll-contain">
         <div className="mb-10 flex items-center gap-3 px-2">
