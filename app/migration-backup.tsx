@@ -79,8 +79,8 @@ export default function MigrationBackup({ token }: { token: string }) {
      if(!init.ok){const err=await init.json().catch(()=>({}));throw new Error("Não foi possível inicializar (HTTP "+init.status+"): "+(err.message||"verifique o SQL da segunda fase"));}
      const result=await init.json();
      if(!result.matches_requested_snapshot)throw new Error("Já existe um estado online iniciado a partir de outro backup. Nada foi sobrescrito.");
-     if(collections.slice(0,5).some(name=>result.counts?.[name]!==snaps[0].counts?.[name]))
-       throw new Error("O estado online foi criado, mas as contagens não coincidem. Não prossiga.");
+     if((["accounts","transactions","categories","cardEntries","pendingTransactions"] as const).some(name=>result.counts?.[name]!==snaps[0].counts?.[name]))
+       throw new Error("As contagens principais realmente divergem. Não prossiga; preserve o backup e informe o suporte.");
      setMessage("Estado inicial online criado e contagens principais conferidas! Ainda não ativamos a sincronização automática; seus dados locais permanecem intactos.");
    }catch(e){setFailed(true);setMessage(e instanceof Error?e.message:"Falha ao iniciar estado online.");}
    finally{setBusy(false);}
