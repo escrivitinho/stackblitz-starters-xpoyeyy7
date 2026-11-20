@@ -6,6 +6,7 @@ import MoneoAuthGate, { useMoneoToken, useMoneoSignOut } from "./moneo-auth-gate
 import { useEffect, useRef, useState } from "react";
 import CategoriesManager, { type Category } from "./categories-manager";
 import CardsManager, { type CardEntry } from "./cards-manager";
+import CardInvoiceHistory from "./card-invoice-history";
 import DriveSettings from "./drive-settings";
 import InvestmentsManager from "./investments-manager";
 import MonthlyReport from "./monthly-report";
@@ -207,6 +208,7 @@ function Home() {
   const cloudQueued = useRef<string | null>(null);
   const cloudBlocked = useRef(false);
   const [active, setActive] = useState("Visão geral");
+  const [launchMenuOpen, setLaunchMenuOpen] = useState(false);
 
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
   const [transactions, setTransactions] =
@@ -1015,9 +1017,9 @@ if (amountCents <= 0) {
           {navigation.map((item) => (
             <button
               key={item.name}
-              onClick={() => goToPage(item.name)}
+              onClick={() => item.name === "Lançamentos" ? setLaunchMenuOpen((open) => !open) : goToPage(item.name)}
               className={`flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
-                active === item.name
+                (active === item.name || (item.name === "Lançamentos" && active.startsWith("Lançamentos ·")))
                   ? "bg-white/80 font-medium text-[#25282D] shadow-sm ring-1 ring-white/80"
                   : "text-[#707780] hover:bg-white/60 hover:text-[#25282D]"
               }`}
@@ -1026,6 +1028,9 @@ if (amountCents <= 0) {
               {item.name}
             </button>
           ))}
+          {launchMenuOpen && <div className="flex flex-col gap-1 rounded-2xl border border-white/70 bg-white/40 p-2 md:ml-5">
+            {[{ name: "Extratos", page: "Lançamentos · Extratos", icon: "▤" }, { name: "Cartões", page: "Lançamentos · Cartões", icon: "▣" }].map((item) => <button key={item.page} type="button" onClick={() => goToPage(item.page)} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${active === item.page ? "bg-white/85 font-semibold text-[#263D59] shadow-sm" : "text-[#707780] hover:bg-white/70"}`}><span>{item.icon}</span>{item.name}</button>)}
+          </div>}
         </nav>
 
         <div className="mt-8 hidden rounded-2xl border border-white/60 bg-white/55 p-4 md:block">
@@ -1083,7 +1088,7 @@ if (amountCents <= 0) {
                 ? "Consulte o saldo e acompanhe as movimentações desta conta."
                 : active === "Contas"
                 ? "Gerencie suas contas e acompanhe seu dinheiro disponível."
-                : active === "Lançamentos"
+                : active === "Lançamentos · Extratos"
                 ? "Registre e acompanhe suas movimentações financeiras."
                 : "Acompanhe suas finanças em um só lugar."}
             </p>
@@ -1106,7 +1111,7 @@ if (amountCents <= 0) {
                   resetTransactionForm();
                   changeTransactionType(type);
                   setShowTransactionForm(true);
-                  setActive("Lançamentos");
+                  setActive("Lançamentos · Extratos");
                 }} className={`rounded-2xl border px-5 py-3 text-sm font-semibold backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 ${type === "income" ? "border-emerald-200/80 bg-gradient-to-br from-emerald-100/85 via-emerald-200/65 to-emerald-300/55 text-emerald-900 shadow-[0_6px_22px_rgba(16,185,129,0.13),inset_0_1px_1px_rgba(255,255,255,0.9)] hover:from-emerald-100 hover:to-emerald-300/75" : "border-rose-200/80 bg-gradient-to-br from-rose-100/85 via-rose-200/65 to-rose-300/55 text-rose-900 shadow-[0_6px_22px_rgba(244,63,94,0.12),inset_0_1px_1px_rgba(255,255,255,0.9)] hover:from-rose-100 hover:to-rose-300/75"}`}>{label}</button>
               ))}
             </div>
@@ -1162,7 +1167,7 @@ if (amountCents <= 0) {
         {/* LANÇAMENTOS */}
         {/* ================================== */}
 
-        {active === "Lançamentos" && (
+        {active === "Lançamentos · Extratos" && (
           <div className="space-y-6">
 
             {/* RESUMO */}
@@ -1891,9 +1896,10 @@ if (amountCents <= 0) {
 
         {active === "Investimentos" && <InvestmentsManager accounts={accounts.map(({ id, name }) => ({ id, name }))} />}
 
-        {active === "Cartões" && (
+        {active === "Lançamentos · Cartões" && (
           <CardsManager entries={cardEntries} onChange={setCardEntries} categories={categories} />
         )}
+        {active === "Cartões" && <CardInvoiceHistory entries={cardEntries} />}
 
         {active === "Central de Importações" && <div className="space-y-5">
           <div className="rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm">
@@ -1941,7 +1947,7 @@ if (amountCents <= 0) {
         )}
 
 
-        {!["Visão geral", "Contas", "Lançamentos", "Categorias", "Configurações", "Central de Importações"].includes(active) && (
+        {!["Visão geral", "Contas", "Lançamentos", "Lançamentos · Extratos", "Lançamentos · Cartões", "Cartões", "Categorias", "Configurações", "Central de Importações", "Investimentos", "Relatórios"].includes(active) && (
           <div className="flex min-h-[420px] flex-col items-center justify-center rounded-3xl border border-white/90 bg-white/55 p-8 text-center shadow-sm backdrop-blur-2xl">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7EEF7] text-3xl text-[#526F96]">✧</div>
             <h3 className="mt-5 text-xl font-semibold text-[#263D59]">{active}</h3>
