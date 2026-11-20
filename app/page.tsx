@@ -7,6 +7,7 @@ import CardsManager, { type CardEntry } from "./cards-manager";
 import DriveSettings from "./drive-settings";
 import InvestmentsManager from "./investments-manager";
 import ClassificationPreview, { excelRules } from "./classification-preview";
+import ExcelReclassification from "./excel-reclassification";
 import { formatCents, parseMoneyToCents } from "./lib/money";
 import {
   calculateTransactionTotals,
@@ -1751,6 +1752,7 @@ if (amountCents <= 0) {
           />
         )}
 
+        {active === "Configurações" && <ExcelReclassification transactions={transactions} categories={categories} onApply={(items, cats) => { setCategories(cats); setTransactions(items); }} />}
         {active === "Configurações" && <ClassificationPreview transactions={transactions} categories={categories} onApply={(ids, categoryId, subcategoryId) => setTransactions(current => current.map(t => ids.includes(t.id) && t.type !== "transfer" && !t.internalTransferPairId && !t.categoryId && !t.subcategoryId ? { ...t, categoryId, subcategoryId, group: categories.find(c => c.id === categoryId)?.name ?? t.group, subcategory: categories.find(c => c.id === categoryId)?.subcategories.find(sub => sub.id === subcategoryId)?.name ?? t.subcategory } : t))} />}
         {active === "Configurações" && (
           <div className="rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm backdrop-blur-2xl">
