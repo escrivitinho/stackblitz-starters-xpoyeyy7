@@ -36,7 +36,7 @@ export default function TopExpenses({transactions,categories}:{transactions:Tran
    const signed=t.type==="income"?-t.amountCents:t.amountCents;
    sums.set(key,(sums.get(key)||0)+signed);
   }
-  return [...sums.entries()].map(([name,amount])=>({name,amount:period==="average"?Math.round(amount/12):amount})).filter(item=>item.amount>0).sort((a,b)=>b.amount-a.amount).slice(0,5);
+  return Array.from(sums.entries()).map(([name,amount])=>({name,amount:period==="average"?Math.round(amount/12):amount})).filter(item=>item.amount>0).sort((a,b)=>b.amount-a.amount).slice(0,5);
  },[transactions,categories,period,level,year,month,expenseNames]);
  const maximum=Math.max(1,...ranked.map(x=>x.amount));
  const periodNames:{[key in Period]:string}={month:"Mês atual",year:"Ano",average:"Média mensal do ano"};
