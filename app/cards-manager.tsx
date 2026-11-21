@@ -118,6 +118,7 @@ export function parseNubankCsv(text: string): Draft[] {
 export default function CardsManager({ entries, onChange, categories, descriptionRules = [], importOnly = false, driveFile }: { entries: CardEntry[]; onChange: (entries: CardEntry[]) => void; categories: Category[]; descriptionRules?: DescriptionRule[]; importOnly?: boolean; driveFile?: File | null }) {
   const [openedCard, setOpenedCard] = useState<CardEntry["card"] | null>(null);
   const [openedInvoice, setOpenedInvoice] = useState<string | null>(null);
+  const [showManualPurchase, setShowManualPurchase] = useState(false);
   const [manualCard, setManualCard] = useState<CardEntry["card"]>("Nubank Crédito");
   const [manualDate, setManualDate] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [manualDescription, setManualDescription] = useState("");
@@ -154,6 +155,7 @@ export default function CardsManager({ entries, onChange, categories, descriptio
     onChange([...entries, ...created]);
     setManualSuccess(manualInstallments === 1 ? "Compra registrada." : manualInstallments + " parcelas registradas.");
     setManualDescription(""); setManualAmount(""); setManualInstallments(1);
+    setShowManualPurchase(false);
   }
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [cardFilter, setCardFilter] = useState("Todos");
@@ -281,7 +283,8 @@ export default function CardsManager({ entries, onChange, categories, descriptio
           </button>;
         })}
       </div>}
-      <section className="rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm backdrop-blur-2xl">
+      <div className="flex justify-end"><button type="button" aria-expanded={showManualPurchase} onClick={() => {setShowManualPurchase(current => !current);setManualError("");setManualSuccess("");}} className="rounded-xl bg-[#344D70] px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#263B57]">{showManualPurchase ? "Fechar novo lançamento" : "+ Novo lançamento"}</button></div>
+      {showManualPurchase && <section className="rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm backdrop-blur-2xl">
         <h3 className="text-lg font-semibold text-[#26364D]">Registrar compra no cartão</h3>
         <p className="mt-2 text-sm text-[#707780]">À vista ou parcelada. Cada parcela aparece no mês de sua fatura, sem alterar o saldo bancário. A conciliação com CSV será implementada depois.</p>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -307,7 +310,7 @@ export default function CardsManager({ entries, onChange, categories, descriptio
         {manualError && <p role="alert" className="mt-3 text-sm text-rose-700">{manualError}</p>}
         {manualSuccess && <p role="status" className="mt-3 text-sm text-emerald-700">{manualSuccess}</p>}
         <button type="button" onClick={addManualPurchase} className="mt-4 rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white hover:bg-[#25282D]">Registrar compra</button>
-      </section>
+      </section>}
       {importOnly && <>
       <section className="rounded-3xl border border-white/90 bg-white/65 p-6 shadow-sm backdrop-blur-2xl">
         <h3 className="text-lg font-semibold text-[#26364D]">Importar fatura de cartão (CSV Nubank)</h3>
