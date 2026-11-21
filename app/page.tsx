@@ -267,6 +267,24 @@ function Home() {
   const [selectedTransactionIds, setSelectedTransactionIds] = useState<number[]>([]);
   const [reconciliationFilter, setReconciliationFilter] = useState<"all" | "open" | "locked">("all");
   const isTransactionLocked = (id: number) => lockedTransactionIds.includes(id);
+  function pairSelectedAsTransfer() {
+    if (selectedTransactionIds.length !== 2) { window.alert("Selecione exatamente dois lançamentos: uma saída e uma entrada."); return; }
+    const pair = selectedTransactionIds.map(id => transactions.find(item => item.id === id));
+    if (pair.some(item => !item)) { window.alert("Um dos lançamentos não foi encontrado."); return; }
+    const outgoing = pair.find(item => item?.type === "expense");
+    const incoming = pair.find(item => item?.type === "income");
+    if (!outgoing || !incoming) { window.alert("A transferência precisa ter uma despesa (saída) e uma receita (entrada)."); return; }
+    if (outgoing.accountId === incoming.accountId) { window.alert("Selecione movimentações de duas contas diferentes."); return; }
+    if (outgoing.amountCents !== incoming.amountCents) { window.alert("Os valores precisam ser iguais para vincular a transferência."); return; }
+    if (pair.some(item => item && (isTransactionLocked(item.id) || item.internalTransferPairId))) { window.alert("Reabra os lançamentos conciliados e escolha movimentações ainda não vinculadas."); return; }
+    const from = accounts.find(account => account.id === outgoing.accountId)?.name || "Origem";
+    const to = accounts.find(account => account.id === incoming.accountId)?.name || "Destino";
+    if (!window.confirm(`Confirmar transferência de ${money(outgoing.amountCents)} de ${from} para ${to}? Os dois registros serão vinculados e conciliados, sem duplicar movimentações bancárias.`)) return;
+    confirmTransferPair(outgoing.id, incoming.id);
+    setLockedTransactionIds(current => Array.from(new Set([...current, outgoing.id, incoming.id])));
+    setSelectedTransactionIds([]);
+    setEditId(null);
+  }
   function setTransactionLock(ids: number[], locked: boolean) {
     setLockedTransactionIds(current => locked ? Array.from(new Set([...current, ...ids])) : current.filter(id => !ids.includes(id)));
     setSelectedTransactionIds([]);
@@ -1686,7 +1704,7 @@ if (amountCents <= 0) {
                     <label className="flex items-center gap-2"><input type="checkbox" checked={filteredTransactions.length > 0 && filteredTransactions.every(t => selectedTransactionIds.includes(t.id))} onChange={event => setSelectedTransactionIds(event.target.checked ? filteredTransactions.map(t => t.id) : [])} /> Selecionar visíveis</label>
                     <span>{selectedTransactionIds.length} selecionado(s)</span>
                     <button type="button" disabled={!selectedTransactionIds.some(id => !lockedTransactionIds.includes(id))} onClick={() => setTransactionLock(selectedTransactionIds.filter(id => !lockedTransactionIds.includes(id)), true)} className="rounded-lg bg-white/90 px-3 py-1.5 font-semibold disabled:opacity-40">Conciliar</button>
-                    <button type="button" disabled={!selectedTransactionIds.some(id => lockedTransactionIds.includes(id))} onClick={() => setTransactionLock(selectedTransactionIds.filter(id => lockedTransactionIds.includes(id)), false)} className="rounded-lg bg-white/90 px-3 py-1.5 font-semibold disabled:opacity-40">Reabrir selecionados</button>
+                    <button type="button" disabled={!selectedTransactionIds.some(id => lockedTransactionIds.includes(id))} onClick={() => setTransactionLock(selectedTransactionIds.filter(id => lockedTransactionIds.includes(id)), false)} className="rounded-lg bg-white/90 px-3 py-1.5 font-semibold disabled:opacity-40">Reabrir selecionados</button>\n                <button type="button" disabled={selectedTransactionIds.length !== 2} onClick={pairSelectedAsTransfer} className="rounded-lg border border-sky-200 bg-sky-50/85 px-3 py-2 font-semibold text-[#344D70] disabled:opacity-40">Vincular como transferência</button>
                   </div>
                   <div className="sticky top-12 z-30 mb-2 hidden grid-cols-[32px_135px_105px_minmax(230px,2fr)_minmax(160px,1.2fr)_minmax(125px,1fr)_145px] items-start gap-3 rounded-xl border border-white/75 bg-[#F1F3F8]/95 px-4 py-3 shadow-[0_6px_20px_rgba(65,85,115,0.10)] backdrop-blur-2xl lg:grid">
                     <span aria-label="Seleção" />
@@ -1828,7 +1846,7 @@ if (amountCents <= 0) {
               <div className="sticky top-0 z-40 mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-white/90 bg-[#F1F3F8]/95 px-3 py-2 text-xs shadow-md backdrop-blur-2xl">
                 <span className="text-[#526B8B]">{accountTransactions.filter(item=>selectedTransactionIds.includes(item.id)).length} selecionado(s)</span>
                 <button type="button" disabled={!accountTransactions.some(item=>selectedTransactionIds.includes(item.id)&&!isTransactionLocked(item.id))} onClick={() => setTransactionLock(accountTransactions.filter(item=>selectedTransactionIds.includes(item.id)&&!isTransactionLocked(item.id)).map(item=>item.id),true)} className="rounded-lg bg-white/90 px-3 py-2 font-semibold text-[#526B8B] disabled:opacity-40">Conciliar</button>
-                <button type="button" disabled={!accountTransactions.some(item=>selectedTransactionIds.includes(item.id)&&isTransactionLocked(item.id))} onClick={() => setTransactionLock(accountTransactions.filter(item=>selectedTransactionIds.includes(item.id)&&isTransactionLocked(item.id)).map(item=>item.id),false)} className="rounded-lg bg-white/90 px-3 py-2 font-semibold text-[#526B8B] disabled:opacity-40">Reabrir selecionados</button>
+                <button type="button" disabled={!accountTransactions.some(item=>selectedTransactionIds.includes(item.id)&&isTransactionLocked(item.id))} onClick={() => setTransactionLock(accountTransactions.filter(item=>selectedTransactionIds.includes(item.id)&&isTransactionLocked(item.id)).map(item=>item.id),false)} className="rounded-lg bg-white/90 px-3 py-2 font-semibold text-[#526B8B] disabled:opacity-40">Reabrir selecionados</button>\n                <button type="button" disabled={selectedTransactionIds.length !== 2} onClick={pairSelectedAsTransfer} className="rounded-lg border border-sky-200 bg-sky-50/85 px-3 py-2 font-semibold text-[#344D70] disabled:opacity-40">Vincular como transferência</button>
               </div>
               <div className="sticky top-12 z-30 mt-3 grid grid-cols-[28px_90px_minmax(0,2fr)_minmax(0,1fr)_105px] gap-3 rounded-xl border border-white/80 bg-[#F1F3F8]/95 px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-[#8494A8] backdrop-blur-2xl md:grid-cols-[28px_110px_105px_minmax(0,2fr)_minmax(0,1fr)_105px]">
                 <span>✓</span><span>Situação</span><span className="hidden md:block">Data</span><span>Descrição</span><span>Categoria</span><span className="text-right">Valor</span>
