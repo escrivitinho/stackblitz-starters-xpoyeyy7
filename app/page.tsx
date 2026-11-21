@@ -61,7 +61,7 @@ const initialAccounts: Account[] = [
   },
 ];
 
-const normalizedExcelText = (value: string) => value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().trim();
+const normalizedExcelText = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 function mergeExcelCategories(existing: Category[]): Category[] {
   const merged = existing.map(category => ({ ...category, subcategories: [...category.subcategories] }));
   for (const [, name, sub, type] of excelRules) {
@@ -1557,10 +1557,17 @@ if (amountCents <= 0) {
                 </p>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap gap-2">{(["all", "open", "locked"] as const).map(status => <button key={status} type="button" onClick={() => { setReconciliationFilter(status); setSelectedTransactionIds([]); }} aria-pressed={reconciliationFilter === status} className={`rounded-xl border px-3 py-2 text-xs font-semibold ${reconciliationFilter === status ? "border-[#B9CBE1] bg-white text-[#263D59]" : "border-white/80 bg-white/40 text-[#77879B]"}`}>{status === "all" ? "Todos" : status === "open" ? "A tratar" : "Concluídos"}</button>)}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {Object.values(transactionColumnFilters).some(value => value.trim()) && (
+                      <button type="button" onClick={() => setTransactionColumnFilters({ date: "", description: "", category: "", amount: "" })} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                        Limpar filtros de pesquisa
+                      </button>
+                    )}
                   <button type="button" aria-expanded={showColumnFilters} onClick={() => setShowColumnFilters((visible) => !visible)}
                     className="rounded-xl border border-white/90 bg-white/70 px-4 py-2 text-xs font-semibold text-[#526B8B] shadow-sm transition hover:bg-white">
                     {showColumnFilters ? "Ocultar filtros avançados" : "Mostrar filtros avançados"}
                   </button>
+                  </div>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap gap-2">
