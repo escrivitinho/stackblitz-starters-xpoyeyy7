@@ -14,6 +14,7 @@ type TransactionBase = {
   categoryId?: string;
   subcategoryId?: string;
   paidFor?: string;
+  isReimbursement?: boolean;
   internalTransferPairId?: string;
   source: TransactionSource;
   externalId?: string;
@@ -60,7 +61,8 @@ export function calculateTransactionTotals(
     (totals, transaction) => {
       if (transaction.internalTransferPairId) return totals;
       if (transaction.type === "income") {
-        totals.incomeCents += transaction.amountCents;
+        if (transaction.isReimbursement) totals.expenseCents -= transaction.amountCents;
+        else totals.incomeCents += transaction.amountCents;
       }
 
       if (transaction.type === "expense") {
