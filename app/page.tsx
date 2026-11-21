@@ -273,7 +273,7 @@ function Home() {
     if (pair.some(item => !item)) { window.alert("Um dos lançamentos não foi encontrado."); return; }
     const outgoing = pair.find(item => item?.type === "expense");
     const incoming = pair.find(item => item?.type === "income");
-    if (!outgoing || !incoming) { window.alert("A transferência precisa ter uma despesa (saída) e uma receita (entrada)."); return; }
+    if (!outgoing || !incoming || outgoing.type !== "expense" || incoming.type !== "income") { window.alert("A transferência precisa ter uma despesa (saída) e uma receita (entrada)."); return; }
     if (outgoing.accountId === incoming.accountId) { window.alert("Selecione movimentações de duas contas diferentes."); return; }
     if (outgoing.amountCents !== incoming.amountCents) { window.alert("Os valores precisam ser iguais para vincular a transferência."); return; }
     if (pair.some(item => item && (isTransactionLocked(item.id) || item.internalTransferPairId))) { window.alert("Reabra os lançamentos conciliados e escolha movimentações ainda não vinculadas."); return; }
