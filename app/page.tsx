@@ -151,6 +151,7 @@ function normalizeCategories(value: Category[]): Category[] {
 
 function migrateTransactions(items: Transaction[], categories: Category[]): Transaction[] {
   return items.map((transaction) => {
+    if (transaction.internalTransferPairId) return { ...transaction, categoryId: undefined, subcategoryId: undefined, group: "Transferências", subcategory: "Transferência entre contas", isReimbursement: false };
     const category = categories.find((item) =>
       item.id === transaction.categoryId ||
       (item.type === transaction.type && item.name === transaction.group)
@@ -513,7 +514,9 @@ function Home() {
         const loadedCategories = mergeExcelCategories(normalizeCategories(stored.categories as Category[]));
         setAccounts(stored.accounts as Account[]);
         setCategories(loadedCategories);
-        setTransactions(migrateTransactions(stored.transactions as Transaction[],loadedCategories));
+        const migratedTransactions = migrateTransactions(stored.transactions as Transaction[], loadedCategories);
+        if (migratedTransactions.some((item, index) => JSON.stringify(item) !== JSON.stringify((stored.transactions as Transaction[])[index]))) lastPayload.current = "migration-pending";
+        setTransactions(migratedTransactions);
         setLockedTransactionIds(Array.isArray(stored.lockedTransactionIds) ? (stored.lockedTransactionIds as unknown[]).filter((id): id is number => typeof id === "number") : []);
         setDescriptionRules(Array.isArray(stored.descriptionRules) ? stored.descriptionRules as DescriptionRule[] : []);
         setCardEntries(Array.isArray(stored.cardEntries) ? stored.cardEntries as CardEntry[] : []);
