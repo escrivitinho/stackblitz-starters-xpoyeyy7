@@ -3,7 +3,7 @@
 
 import MoneoAuthGate, { useMoneoToken, useMoneoSignOut } from "./moneo-auth-gate";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import CategoriesManager, { type Category } from "./categories-manager";
 
 function GlassCategoryPicker({ categories, categoryId, onPick }: { categories: Category[]; categoryId: string; onPick: (categoryId: string) => void }) {
