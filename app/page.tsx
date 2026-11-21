@@ -11,6 +11,7 @@ function GlassCategoryPicker({ categories, categoryId, onPick }: { categories: C
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(0);
   const root = useRef<HTMLDivElement>(null);
+  const pickerId = useId();
   const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
   const selected = categories.find(item => item.id === categoryId);
   const filtered = categories.filter(item => normalize(item.name).includes(normalize(query)));
@@ -42,12 +43,12 @@ function GlassSubcategoryPicker({ categories, categoryId, subcategoryId, onPick 
   const choose = (item: typeof options[number]) => { onPick(item.category.id, item.subcategory.id); setQuery(""); setOpen(false); setFocused(0); };
   useEffect(() => { if (!open) return; const listener = (event: MouseEvent) => { if (!root.current?.contains(event.target as Node)) { setOpen(false); setQuery(""); } }; document.addEventListener("mousedown", listener); return () => document.removeEventListener("mousedown", listener); }, [open]);
   return <div ref={root} className="relative space-y-1">
-    <label htmlFor="glass-subcategory-search" className="block text-xs text-[#64748B]">Subcategoria</label>
+    <label htmlFor={pickerId + "-search"} className="block text-xs text-[#64748B]">Subcategoria</label>
     <div className="flex items-center rounded-xl border border-white/85 bg-white/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_5px_18px_rgba(80,110,150,0.07)] backdrop-blur-xl focus-within:ring-2 focus-within:ring-[#A7BBD6]">
-      <input id="glass-subcategory-search" name="moneo-subcategory-lookup" autoComplete="off" autoCorrect="off" spellCheck={false} role="combobox" aria-expanded={open} aria-controls="glass-subcategory-options" aria-autocomplete="list" value={open ? query : (selected?.subcategory.name ?? "")} placeholder="Pesquisar subcategoria..." onFocus={() => {setOpen(true);setQuery("");setFocused(0);}} onChange={event => {setQuery(event.target.value);setOpen(true);setFocused(0);}} onKeyDown={event => {if (event.key === "Escape") {setOpen(false);setQuery("");(event.target as HTMLInputElement).blur();} if (event.key === "ArrowDown") {event.preventDefault();setFocused(index => Math.min(index+1,filtered.length-1));} if (event.key === "ArrowUp") {event.preventDefault();setFocused(index => Math.max(index-1,0));} if (event.key === "Enter" && open && filtered[focused]) {event.preventDefault();choose(filtered[focused]);(event.target as HTMLInputElement).blur();}}} className="min-w-0 w-full bg-transparent px-3 py-2.5 text-sm text-[#35445A] outline-none placeholder:text-[#94A3B8]" />
+      <input id={pickerId + "-search"} name="moneo-subcategory-lookup" autoComplete="off" autoCorrect="off" spellCheck={false} role="combobox" aria-expanded={open} aria-controls={pickerId + "-options"} aria-autocomplete="list" value={open ? query : (selected?.subcategory.name ?? "")} placeholder="Pesquisar subcategoria..." onFocus={() => {setOpen(true);setQuery("");setFocused(0);}} onChange={event => {setQuery(event.target.value);setOpen(true);setFocused(0);}} onKeyDown={event => {if (event.key === "Escape") {setOpen(false);setQuery("");(event.target as HTMLInputElement).blur();} if (event.key === "ArrowDown") {event.preventDefault();setFocused(index => Math.min(index+1,filtered.length-1));} if (event.key === "ArrowUp") {event.preventDefault();setFocused(index => Math.max(index-1,0));} if (event.key === "Enter" && open && filtered[focused]) {event.preventDefault();choose(filtered[focused]);(event.target as HTMLInputElement).blur();}}} className="min-w-0 w-full bg-transparent px-3 py-2.5 text-sm text-[#35445A] outline-none placeholder:text-[#94A3B8]" />
       <button type="button" aria-label="Mostrar subcategorias" onClick={() => {setOpen(!open);setQuery("");setFocused(0);}} className="px-3 text-[#64748B]">⌄</button>
     </div>
-    {open && <div id="glass-subcategory-options" role="listbox" className="absolute left-0 right-0 top-full z-50 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-white/90 bg-[#F4F7FC]/95 p-1.5 shadow-[0_16px_45px_rgba(55,75,110,0.22)] backdrop-blur-2xl">
+    {open && <div id={pickerId + "-options"} role="listbox" className="absolute left-0 right-0 top-full z-50 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-white/90 bg-[#F4F7FC]/95 p-1.5 shadow-[0_16px_45px_rgba(55,75,110,0.22)] backdrop-blur-2xl">
       {filtered.length === 0 && <p className="px-3 py-3 text-sm text-[#64748B]">Nenhuma subcategoria encontrada.</p>}
       {filtered.map((item,index) => <button key={item.category.id + ":" + item.subcategory.id} type="button" role="option" aria-selected={selected?.category.id === item.category.id && selected?.subcategory.id === item.subcategory.id} onMouseEnter={() => setFocused(index)} onClick={() => choose(item)} className={`flex w-full flex-col rounded-xl px-3 py-2 text-left transition-colors ${index === focused ? "bg-white/90 shadow-sm" : "hover:bg-white/65"}`}><span className="text-sm font-medium text-[#35445A]">{item.subcategory.name}</span><span className="text-xs text-[#718198]">{item.category.name}</span></button>)}
     </div>}
@@ -1752,18 +1753,11 @@ if (amountCents <= 0) {
                   </div>
                   {bulkCategoryOpen && (
                     <div className="relative z-40 mb-3 flex flex-wrap items-end gap-3 rounded-2xl border border-white/90 bg-white/85 p-4 shadow-lg backdrop-blur-2xl">
-                      <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-xs font-semibold text-[#526B8B]">Categoria
-                        <select value={bulkCategoryId} onChange={event => { setBulkCategoryId(event.target.value); setBulkSubcategoryId(""); }} className="rounded-xl border border-[#DDE5EF] bg-white px-3 py-2 text-sm">
-                          <option value="">Selecione</option>
-                          {categories.filter(category => category.type !== "transfer").map(category => <option key={category.id} value={category.id}>{category.type === "income" ? "Receita" : "Despesa"} · {category.name}</option>)}
-                        </select>
-                      </label>
-                      <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-xs font-semibold text-[#526B8B]">Subcategoria
-                        <select value={bulkSubcategoryId} onChange={event => setBulkSubcategoryId(event.target.value)} className="rounded-xl border border-[#DDE5EF] bg-white px-3 py-2 text-sm">
-                          <option value="">Selecione</option>
-                          {categories.find(category => category.id === bulkCategoryId)?.subcategories.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
-                        </select>
-                      </label>
+                      <div className="relative z-50 min-w-[240px] flex-[2]">
+                        <GlassSubcategoryPicker categories={categories.filter(category => category.type === "income" || category.type === "expense")} categoryId={bulkCategoryId} subcategoryId={bulkSubcategoryId} onPick={(categoryId, subcategoryId) => { setBulkCategoryId(categoryId); setBulkSubcategoryId(subcategoryId); }} />
+                        <p className="mt-1 text-xs text-[#718198]">Digite a subcategoria; a categoria será identificada automaticamente.</p>
+                      </div>
+                      {bulkCategoryId && <div className="min-w-[160px] rounded-xl border border-[#DDE5EF] bg-white/65 px-3 py-2 text-sm text-[#344D70]"><span className="block text-xs text-[#718198]">Categoria identificada</span><strong>{categories.find(category => category.id === bulkCategoryId)?.name}</strong></div>}
                       <button type="button" onClick={applyBulkCategory} disabled={!bulkCategoryId || !bulkSubcategoryId} className="rounded-xl bg-[#344D70] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">Aplicar aos selecionados</button>
                       <button type="button" onClick={() => setBulkCategoryOpen(false)} className="rounded-xl border border-[#DDE5EF] bg-white px-4 py-2.5 text-sm">Cancelar</button>
                       <p className="w-full text-xs text-[#718198]">Lançamentos conciliados, transferências vinculadas e tipos incompatíveis não serão alterados.</p>
