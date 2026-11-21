@@ -802,9 +802,7 @@ const newAccount: Account = {
   function editAccount(account: Account) {
     setAccountName(account.name);
     setAccountType(account.type);
-    setBalanceMethod(
-      account.source === "statement" ? "statement" : "manual"
-    );
+    setBalanceMethod("manual");
 
     setInitialBalance(
       account.openingBalanceCents === null
@@ -1926,34 +1924,6 @@ if (amountCents <= 0) {
                   </label>
                 </div>
 
-                <div className="mt-6">
-                  <p className="mb-3 text-xs font-medium text-[#64748B]">Como deseja informar o saldo inicial?</p>
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={() => setBalanceMethod("manual")}
-                      className={`rounded-2xl border p-4 text-left transition ${
-                        balanceMethod === "manual" ? "border-[#A7A9AF] bg-white/70" : "border-[#E2E8F0] bg-white/60"
-                      }`}
-                    >
-                      <span className="text-lg">✎</span>
-                      <p className="mt-2 text-sm font-semibold text-[#354B68]">Informar manualmente</p>
-                      <p className="mt-1 text-xs text-[#8998AA]">Digitar o saldo atual da conta.</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setBalanceMethod("statement")}
-                      className={`rounded-2xl border p-4 text-left transition ${
-                        balanceMethod === "statement" ? "border-[#A7A9AF] bg-white/70" : "border-[#E2E8F0] bg-white/60"
-                      }`}
-                    >
-                      <span className="text-lg">⇧</span>
-                      <p className="mt-2 text-sm font-semibold text-[#354B68]">Pelo primeiro extrato</p>
-                      <p className="mt-1 text-xs text-[#8998AA]">Calcular o saldo a partir do arquivo importado.</p>
-                    </button>
-                  </div>
-                </div>
-
                 {balanceMethod === "manual" && (
                   <label className="mt-5 block space-y-2">
                     <span className="text-xs font-medium text-[#64748B]">Saldo inicial (R$)</span>
@@ -1980,15 +1950,6 @@ if (amountCents <= 0) {
                       className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF] md:max-w-sm"
                     />
                   </label>
-                )}
-
-                {balanceMethod === "statement" && (
-                  <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
-                    <p className="text-sm font-medium text-[#456486]">Importação de extrato</p>
-                    <p className="mt-1 text-xs leading-5 text-[#7189A4]">
-                      A conta será cadastrada sem saldo inicial. A importação CSV e OFX será implementada em uma próxima etapa.
-                    </p>
-                  </div>
                 )}
 
                 {accountError && (
