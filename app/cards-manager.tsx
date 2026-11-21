@@ -326,35 +326,43 @@ export default function CardsManager({ entries, onChange, categories, descriptio
           <label className="text-xs text-[#64748B]">Cartão<select aria-label="Filtrar cartão" className="mt-1 block rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-sm" value={cardFilter} onChange={(e) => setCardFilter(e.target.value)}><option>Todos</option><option>Nubank Crédito</option><option>Inter Crédito</option></select></label>
           <label className="text-xs text-[#64748B]">Mês<select aria-label="Filtrar mês" className="mt-1 block rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-sm" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}><option>Todos</option>{months.map((month) => <option key={month} value={month}>{month.slice(5)}/{month.slice(0, 4)}</option>)}</select></label>
         </div>
-        <div className="mt-5 space-y-3">
+        <div className="mt-5 space-y-2">
+          <div className="sticky top-0 z-30 hidden grid-cols-[120px_100px_minmax(240px,2fr)_minmax(170px,1.2fr)_130px_130px] gap-3 rounded-xl border border-white/80 bg-[#F1F3F8]/95 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#8190A4] shadow-sm backdrop-blur-2xl lg:grid">
+            <span>Situação</span><span>Data</span><span>Descrição</span><span>Categoria</span><span>Cartão</span><span className="text-right">Valor</span>
+          </div>
           {filtered.map((entry) => {
             const kind = entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase");
-            const category = expenseCategories.find((item) => item.id === entry.categoryId);
+            const category = expenseCategories.find(item => item.id === entry.categoryId);
+            const subcategory = category?.subcategories.find(item => item.id === entry.subcategoryId);
             const suggestion = kind === "purchase" ? findSuggestion(entry, entries, categories) : null;
-            const suggestedCategory = suggestion ? expenseCategories.find((item) => item.id === suggestion.categoryId) : undefined;
-            const suggestedSubcategory = suggestedCategory?.subcategories.find((item) => item.id === suggestion?.subcategoryId);
+            const suggestedCategory = suggestion ? expenseCategories.find(item => item.id === suggestion.categoryId) : undefined;
+            const suggestedSubcategory = suggestedCategory?.subcategories.find(item => item.id === suggestion?.subcategoryId);
             const editing = editingEntryId === entry.id;
-            const subcategory = category?.subcategories.find((item) => item.id === entry.subcategoryId);
-            return <div key={entry.id} className={`rounded-2xl border bg-white/75 p-4 transition-colors ${editing ? "border-[#A7BBD6] shadow-sm" : "border-[#E5EAF0] hover:border-[#CAD6E6]"}`}>
-              <button type="button" aria-expanded={editing} aria-label={(editing ? "Fechar edição de " : "Editar ") + entry.description} onClick={() => setEditingEntryId(editing ? null : entry.id)} className="w-full text-left">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0"><p className="font-medium text-[#26364D]">{entry.description}</p><p className="mt-1 text-xs text-[#77879B]">{entry.date.split("-").reverse().join("/")} · {entry.card}</p></div>
-                  <div className="flex items-center gap-3"><p className={`font-semibold ${entry.amountCents < 0 ? "text-emerald-700" : "text-[#B65D58]"}`}>{entry.amountCents < 0 ? "−" : ""}{formatCents(Math.abs(entry.amountCents))}</p><span aria-hidden="true" className="text-[#7A8BA4]">{editing ? "⌃" : "⌄"}</span></div>
-                </div>
-                <p className="mt-2 text-xs text-[#64748B]">{kind === "purchase" ? "Compra" : kind === "credit" ? "Crédito / estorno" : "Pagamento da fatura"}{kind === "purchase" ? " · " + (category?.name ?? "Não classificada") + (subcategory ? " → " + subcategory.name : "") : ""}</p>
-              </button>
-              {editing && <>
-                {suggestion && suggestedCategory && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-200/80 bg-sky-50/80 px-3 py-2">
-                  <p className="text-xs text-[#395D7A]">Sugestão baseada em compras classificadas com a mesma descrição: <strong>{suggestedCategory.name}{suggestedSubcategory ? " → " + suggestedSubcategory.name : ""}</strong></p>
-                  <button type="button" onClick={() => updateEntry(entry.id, { categoryId: suggestion.categoryId, subcategoryId: suggestion.subcategoryId })} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-[#294263] shadow-sm ring-1 ring-sky-200 hover:bg-sky-100">Aplicar sugestão</button>
+            const credit = kind === "credit" || entry.amountCents < 0;
+            const classified = kind === "purchase" && Boolean(category);
+            const glassBackground = credit ? "linear-gradient(120deg, rgba(101,221,172,0.59), rgba(211,251,233,0.48))" : "linear-gradient(120deg, rgba(251,155,171,0.62), rgba(255,224,230,0.49))";
+            const glassBorder = credit ? "rgba(16,185,129,0.55)" : "rgba(225,72,102,0.56)";
+            return <div key={entry.id} style={{background: kind === "payment" ? "rgba(255,255,255,0.40)" : glassBackground, borderColor: kind === "payment" ? "rgba(203,213,225,0.55)" : glassBorder}} className={`rounded-2xl border px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_5px_18px_rgba(70,90,120,0.035)] backdrop-blur-xl ${editing ? "ring-1 ring-[#A7BBD6]" : ""}`}>
+              <div className="grid grid-cols-1 gap-2 lg:grid-cols-[120px_100px_minmax(240px,2fr)_minmax(170px,1.2fr)_130px_130px] lg:gap-3">
+                <span className="inline-flex h-8 w-[116px] items-center justify-center rounded-lg border border-white/75 bg-white/55 px-2 text-xs font-semibold text-[#526B8B]">{kind === "payment" ? "Pagamento" : classified ? "Classificado" : "A tratar"}</span>
+                <span className="text-xs text-[#64748B] lg:pt-1">{entry.date.split("-").reverse().join("/")}</span>
+                <button type="button" aria-expanded={editing} aria-label={(editing ? "Fechar edição de " : "Editar ") + entry.description} onClick={() => setEditingEntryId(editing ? null : entry.id)} className="min-w-0 whitespace-normal break-words text-left text-sm font-medium leading-relaxed text-[#35445A]">{entry.description}</button>
+                <span className="min-w-0 whitespace-normal break-words text-xs leading-relaxed text-[#64748B] lg:pt-1">{kind === "purchase" ? (category?.name ?? "Não classificada") + (subcategory ? " → " + subcategory.name : "") : kind === "credit" ? "Crédito / estorno" : "Pagamento da fatura"}</span>
+                <span className="text-xs text-[#64748B] lg:pt-1">{entry.card}</span>
+                <button type="button" onClick={() => setEditingEntryId(editing ? null : entry.id)} className={`whitespace-nowrap text-left text-sm font-semibold lg:text-right ${credit ? "text-emerald-700" : "text-[#B65D58]"}`}>{credit ? "−" : ""}{formatCents(Math.abs(entry.amountCents))} <span className="text-[#7A8BA4]">{editing ? "⌃" : "⌄"}</span></button>
+              </div>
+              {editing && <div className="mt-4 space-y-3 border-t border-white/65 pt-4">
+                {suggestion && suggestedCategory && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-200/80 bg-sky-50/80 px-3 py-2">
+                  <p className="text-xs text-[#395D7A]">Sugestão: <strong>{suggestedCategory.name}{suggestedSubcategory ? " → " + suggestedSubcategory.name : ""}</strong></p>
+                  <button type="button" onClick={() => updateEntry(entry.id, { categoryId: suggestion.categoryId, subcategoryId: suggestion.subcategoryId })} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-[#294263] shadow-sm ring-1 ring-sky-200">Aplicar sugestão</button>
                 </div>}
-                <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                  <label className="text-xs text-[#64748B]">Tipo<select aria-label={"Tipo: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm" value={kind} onChange={(e) => updateEntry(entry.id, { kind: e.target.value as CardEntry["kind"], categoryId: undefined, subcategoryId: undefined })}><option value="purchase">Compra</option><option value="credit">Crédito / estorno</option><option value="payment">Pagamento da fatura</option></select></label>
-                  <label className="text-xs text-[#64748B]">Categoria<select disabled={kind !== "purchase"} aria-label={"Categoria: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm disabled:opacity-40" value={entry.categoryId ?? ""} onChange={(e) => updateEntry(entry.id, { categoryId: e.target.value || undefined, subcategoryId: undefined })}><option value="">Não classificada</option>{expenseCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-                  <label className="text-xs text-[#64748B]">Subcategoria<select disabled={kind !== "purchase" || !category} aria-label={"Subcategoria: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm disabled:opacity-40" value={entry.subcategoryId ?? ""} onChange={(e) => updateEntry(entry.id, { subcategoryId: e.target.value || undefined })}><option value="">Não selecionada</option>{category?.subcategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <label className="text-xs text-[#64748B]">Tipo<select aria-label={"Tipo: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm" value={kind} onChange={e => updateEntry(entry.id, {kind:e.target.value as CardEntry["kind"], categoryId:undefined, subcategoryId:undefined})}><option value="purchase">Compra</option><option value="credit">Crédito / estorno</option><option value="payment">Pagamento da fatura</option></select></label>
+                  <label className="text-xs text-[#64748B]">Categoria<select disabled={kind !== "purchase"} aria-label={"Categoria: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm disabled:opacity-40" value={entry.categoryId ?? ""} onChange={e => updateEntry(entry.id,{categoryId:e.target.value || undefined,subcategoryId:undefined})}><option value="">Não classificada</option>{expenseCategories.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                  <label className="text-xs text-[#64748B]">Subcategoria<select disabled={kind !== "purchase" || !category} aria-label={"Subcategoria: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm disabled:opacity-40" value={entry.subcategoryId ?? ""} onChange={e => updateEntry(entry.id,{subcategoryId:e.target.value || undefined})}><option value="">Não selecionada</option>{category?.subcategories.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
                 </div>
-                <div className="mt-3 flex justify-end"><button type="button" onClick={() => setEditingEntryId(null)} className="rounded-lg px-3 py-2 text-xs font-semibold text-[#526B8B] hover:bg-[#EDF2F8]">Concluir edição</button></div>
-              </>}
+                <div className="flex justify-end"><button type="button" onClick={() => setEditingEntryId(null)} className="rounded-lg border border-white/80 bg-white/65 px-4 py-2 text-xs font-semibold text-[#526B8B]">Concluir edição</button></div>
+              </div>}
             </div>;
           })}
           {filtered.length === 0 && <p className="py-5 text-sm text-[#77879B]">Nenhuma movimentação neste filtro.</p>}
