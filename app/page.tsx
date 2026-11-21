@@ -1684,13 +1684,13 @@ if (amountCents <= 0) {
                 </div>
               ) : (
                 <div className="space-y-1">
-                  <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-white/80 bg-white/45 px-3 py-2 text-xs text-[#526B8B]">
+                  <div className="sticky top-0 z-40 mb-3 flex min-h-12 flex-wrap items-center gap-2 rounded-xl border border-white/85 bg-[#F1F3F8]/95 px-3 py-2 text-xs text-[#526B8B] shadow-[0_6px_20px_rgba(65,85,115,0.10)] backdrop-blur-2xl">
                     <label className="flex items-center gap-2"><input type="checkbox" checked={filteredTransactions.length > 0 && filteredTransactions.every(t => selectedTransactionIds.includes(t.id))} onChange={event => setSelectedTransactionIds(event.target.checked ? filteredTransactions.map(t => t.id) : [])} /> Selecionar visíveis</label>
                     <span>{selectedTransactionIds.length} selecionado(s)</span>
-                    <button type="button" disabled={!selectedTransactionIds.some(id => !lockedTransactionIds.includes(id))} onClick={() => setTransactionLock(selectedTransactionIds.filter(id => !lockedTransactionIds.includes(id)), true)} className="rounded-lg bg-white/90 px-3 py-1.5 font-semibold disabled:opacity-40">Concluir selecionados</button>
+                    <button type="button" disabled={!selectedTransactionIds.some(id => !lockedTransactionIds.includes(id))} onClick={() => setTransactionLock(selectedTransactionIds.filter(id => !lockedTransactionIds.includes(id)), true)} className="rounded-lg bg-white/90 px-3 py-1.5 font-semibold disabled:opacity-40">Conciliar</button>
                     <button type="button" disabled={!selectedTransactionIds.some(id => lockedTransactionIds.includes(id))} onClick={() => setTransactionLock(selectedTransactionIds.filter(id => lockedTransactionIds.includes(id)), false)} className="rounded-lg bg-white/90 px-3 py-1.5 font-semibold disabled:opacity-40">Reabrir selecionados</button>
                   </div>
-                  <div className="sticky top-0 z-30 mb-2 hidden grid-cols-[32px_135px_105px_minmax(230px,2fr)_minmax(160px,1.2fr)_minmax(125px,1fr)_145px] items-start gap-3 rounded-xl border border-white/75 bg-[#F1F3F8]/95 px-4 py-3 shadow-[0_6px_20px_rgba(65,85,115,0.10)] backdrop-blur-2xl lg:grid">
+                  <div className="sticky top-12 z-30 mb-2 hidden grid-cols-[32px_135px_105px_minmax(230px,2fr)_minmax(160px,1.2fr)_minmax(125px,1fr)_145px] items-start gap-3 rounded-xl border border-white/75 bg-[#F1F3F8]/95 px-4 py-3 shadow-[0_6px_20px_rgba(65,85,115,0.10)] backdrop-blur-2xl lg:grid">
                     <span aria-label="Seleção" />
                     <span className="text-xs font-semibold uppercase tracking-wide text-[#8190A4]">Situação</span>
                     {(["date", "description", "category"] as const).map(column => (
