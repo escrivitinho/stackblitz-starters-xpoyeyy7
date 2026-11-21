@@ -372,6 +372,7 @@ function Home() {
         const source = editItem;
         setTransactions(current => current.map(item => item.id === source.id ? { ...source, type: "transfer" as const, fromAccountId: source.accountId, toAccountId: destination, group: "Transferência", subcategory: "Entre contas", categoryId: undefined, subcategoryId: undefined, displayDescription: editDescription.trim() || undefined, paidFor: editPaidFor.trim() } : item));
       }
+      setLockedTransactionIds(current => Array.from(new Set([...current, editId, ...(incoming ? [incoming.id] : [])])));
       setEditId(null);
       return;
     }
@@ -382,6 +383,7 @@ function Home() {
       categoryId: category?.id, subcategoryId: subcategory?.id,
       group: category?.name || item.group, subcategory: subcategory?.name || (category ? "" : item.subcategory)
     } : item));
+    setLockedTransactionIds(current => Array.from(new Set([...current, editId])));
     setEditId(null);
   }
 
@@ -1638,7 +1640,7 @@ if (amountCents <= 0) {
                       <div className="grid grid-cols-[28px_minmax(0,1fr)] gap-3 lg:grid-cols-[32px_135px_105px_minmax(230px,2fr)_minmax(160px,1.2fr)_minmax(125px,1fr)_145px] lg:items-start">
                         <input type="checkbox" aria-label={`Selecionar lançamento ${transaction.id}`} checked={selectedTransactionIds.includes(transaction.id)} onChange={event => setSelectedTransactionIds(current => event.target.checked ? [...current,transaction.id] : current.filter(id => id !== transaction.id))} className="mt-1" />
                         <div className="col-start-2 flex flex-wrap items-center gap-2 lg:col-start-2">
-                          <button type="button" title={isTransactionLocked(transaction.id) ? "Clique para reabrir" : "Concluir e bloquear"} onClick={() => setTransactionLock([transaction.id], !isTransactionLocked(transaction.id))} className={`inline-flex h-8 w-[116px] shrink-0 items-center justify-center whitespace-nowrap rounded-lg border px-2 text-xs font-semibold ${isTransactionLocked(transaction.id) ? "border-slate-300/80 bg-slate-100/75 text-slate-600" : "border-[#DCE5EF] bg-white/70 text-[#526B8B]"}`}>{isTransactionLocked(transaction.id) ? "🔒 Conciliado" : "✓ Concluir"}</button>
+                          {isTransactionLocked(transaction.id) ? <button type="button" title="Clique para reabrir este lançamento" onClick={() => setTransactionLock([transaction.id], false)} className="inline-flex h-8 w-[116px] shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-slate-300/80 bg-slate-100/75 px-2 text-xs font-semibold text-slate-600">🔒 Conciliado</button> : <span className="inline-flex h-8 w-[116px] shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-[#DCE5EF] bg-white/40 px-2 text-xs font-medium text-[#64748B]">A tratar</span>}
                           {!isTransactionLocked(transaction.id) && <button type="button" onClick={() => deleteTransaction(transaction.id)} className="text-xs font-medium text-[#596779] transition-colors hover:text-rose-700" title="Excluir lançamento">Excluir</button>}
                         </div>
                         <span className="col-start-2 text-xs text-[#64748B] lg:col-start-3 lg:pt-1">{displayDate(transaction.date)}</span>
@@ -1661,7 +1663,7 @@ if (amountCents <= 0) {
                         </div>}
                         <label className="block space-y-1"><span className="text-xs text-[#64748B]">Por conta de quem? (opcional)</span><input value={editPaidFor} onChange={(event) => setEditPaidFor(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm" /></label>
                         <p className="text-xs text-[#77879B]">A edição não altera valor, data, conta nem o texto original do extrato.</p>
-                        <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditId(null)} className="rounded-xl border border-[#DCE5EF] bg-white px-4 py-2 text-xs font-semibold text-[#526B8B]">Cancelar</button><button type="button" onClick={saveEdit} className="rounded-xl bg-[#344D70] px-4 py-2 text-xs font-semibold text-white">{editAsTransfer && editItem.type === "expense" ? "Confirmar transferência" : "Salvar e concluir"}</button></div>
+                        <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditId(null)} className="rounded-xl border border-[#DCE5EF] bg-white px-4 py-2 text-xs font-semibold text-[#526B8B]">Cancelar</button><button type="button" onClick={saveEdit} className="rounded-xl bg-[#344D70] px-4 py-2 text-xs font-semibold text-white">{editAsTransfer && editItem.type === "expense" ? "Confirmar transferência" : "Salvar e conciliar"}</button></div>
                       </div>}
                     </div>
                   ))}               </div>
