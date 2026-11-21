@@ -336,6 +336,10 @@ function Home() {
   const [editSubcategoryId, setEditSubcategoryId] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editPaidFor, setEditPaidFor] = useState("");
+  const [editAsTransfer, setEditAsTransfer] = useState(false);
+  const [editTransferDestination, setEditTransferDestination] = useState("");
+  const [editTransferMatchingIncome, setEditTransferMatchingIncome] = useState("");
+  const [editTransferError, setEditTransferError] = useState("");
   const editItem = transactions.find((item) => item.id === editId);
   const editCategories = categories.filter((item) => item.type === (editItem?.type === "income" ? "income" : "expense"));
   const editCategory = editCategories.find((item) => item.id === editCategoryId);
@@ -346,9 +350,31 @@ function Home() {
     setEditSubcategoryId(item.subcategoryId || "");
     setEditDescription(item.displayDescription || item.description);
     setEditPaidFor(item.paidFor || "");
+    setEditAsTransfer(item.type === "transfer");
+    setEditTransferDestination(item.type === "transfer" ? String(item.toAccountId) : "");
+    setEditTransferMatchingIncome("");
+    setEditTransferError("");
   }
   function saveEdit() {
     if (editId === null || isTransactionLocked(editId)) { setEditId(null); return; }
+    if (editItem?.type === "expense" && editAsTransfer) {
+      const destination = Number(editTransferDestination);
+      if (!accounts.some(account => account.id === destination) || destination === editItem.accountId) { setEditTransferError("Selecione uma conta de destino diferente da origem."); return; }
+      const matches = transactions.filter(item => item.type === "income" && item.accountId === destination && item.amountCents === editItem.amountCents && !item.internalTransferPairId && Math.abs(Date.parse(item.date + "T12:00:00Z") - Date.parse(editItem.date + "T12:00:00Z")) <= 3 * 86400000);
+      if (matches.length && !editTransferMatchingIncome) { setEditTransferError("Existe uma entrada correspondente na conta de destino. Selecione-a para evitar duplicar o saldo."); return; }
+      const incoming = matches.find(item => String(item.id) === editTransferMatchingIncome);
+      if (editTransferMatchingIncome && !incoming) { setEditTransferError("A entrada selecionada não está mais disponível."); return; }
+      if (incoming && isTransactionLocked(incoming.id)) { setEditTransferError("Reabra a entrada correspondente antes de conciliá-la."); return; }
+      if (incoming) {
+        const pairId = "internal:" + transferPairKey(editItem.id, incoming.id);
+        setTransactions(current => current.map(item => item.id === editItem.id || item.id === incoming.id ? { ...item, internalTransferPairId: pairId } : item));
+      } else {
+        const source = editItem;
+        setTransactions(current => current.map(item => item.id === source.id ? { ...source, type: "transfer" as const, fromAccountId: source.accountId, toAccountId: destination, group: "Transferência", subcategory: "Entre contas", categoryId: undefined, subcategoryId: undefined, displayDescription: editDescription.trim() || undefined, paidFor: editPaidFor.trim() } : item));
+      }
+      setEditId(null);
+      return;
+    }
     const category = editCategories.find((item) => item.id === editCategoryId);
     const subcategory = category?.subcategories.find((item) => item.id === editSubcategoryId);
     setTransactions((current) => current.map((item) => item.id === editId && !lockedTransactionIds.includes(item.id) ? { ...item,
@@ -1615,13 +1641,19 @@ if (amountCents <= 0) {
                       </div>
                       {editId === transaction.id && editItem && !isTransactionLocked(transaction.id) && <div className="mt-4 space-y-3 border-t border-[#E5EAF0] pt-4">
                         <label className="block space-y-1"><span className="text-xs text-[#64748B]">Descrição exibida</span><input value={editDescription} onChange={(event) => setEditDescription(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm" /></label>
-                        {editItem.type !== "transfer" && <div className="grid gap-3 sm:grid-cols-2">
+                        {editItem.type === "expense" && <label className="flex items-center gap-2 rounded-xl border border-[#DCE5EF] bg-white/70 p-3 text-sm text-[#35445A]"><input type="checkbox" checked={editAsTransfer} onChange={event => { setEditAsTransfer(event.target.checked); setEditTransferError(""); }} /> Reclassificar como transferência entre minhas contas</label>}
+                        {editItem.type === "expense" && editAsTransfer && <div className="space-y-3 rounded-xl border border-[#DCE5EF] bg-white/65 p-3">
+                          <label className="block space-y-1"><span className="text-xs text-[#64748B]">Conta de destino</span><select value={editTransferDestination} onChange={event => {setEditTransferDestination(event.target.value);setEditTransferMatchingIncome("");setEditTransferError("");}} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm"><option value="">Selecione a conta</option>{accounts.filter(account => account.id !== editItem.accountId).map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>
+                          {(() => { const matches = transactions.filter(item => item.type === "income" && item.accountId === Number(editTransferDestination) && item.amountCents === editItem.amountCents && !item.internalTransferPairId && Math.abs(Date.parse(item.date + "T12:00:00Z") - Date.parse(editItem.date + "T12:00:00Z")) <= 3 * 86400000); return matches.length > 0 ? <label className="block space-y-1"><span className="text-xs text-[#64748B]">Entrada correspondente (obrigatória quando encontrada)</span><select value={editTransferMatchingIncome} onChange={event => {setEditTransferMatchingIncome(event.target.value);setEditTransferError("");}} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm"><option value="">Selecione a entrada</option>{matches.map(item => <option key={item.id} value={item.id}>{displayDate(item.date)} · {item.description} · {money(item.amountCents)}{isTransactionLocked(item.id) ? " (reabra antes)" : ""}</option>)}</select></label> : <p className="text-xs text-amber-800">Nenhuma entrada correspondente encontrada nesta conta (mesmo valor, até 3 dias). A transferência movimentará os saldos das duas contas. Confirme que a entrada não foi importada separadamente.</p>; })()}
+                          {editTransferError && <p role="alert" className="text-xs font-semibold text-rose-700">{editTransferError}</p>}
+                        </div>}
+                        {editItem.type !== "transfer" && !editAsTransfer && <div className="grid gap-3 sm:grid-cols-2">
                           <label className="block space-y-1"><span className="text-xs text-[#64748B]">Categoria</span><select value={editCategoryId} onChange={(event) => {setEditCategoryId(event.target.value);setEditSubcategoryId("");}} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm"><option value="">Não classificada</option>{editCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
                           <label className="block space-y-1"><span className="text-xs text-[#64748B]">Subcategoria</span><select disabled={!editCategoryId} value={editSubcategoryId} onChange={(event) => setEditSubcategoryId(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm disabled:opacity-40"><option value="">Não selecionada</option>{editCategory?.subcategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
                         </div>}
                         <label className="block space-y-1"><span className="text-xs text-[#64748B]">Por conta de quem? (opcional)</span><input value={editPaidFor} onChange={(event) => setEditPaidFor(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm" /></label>
                         <p className="text-xs text-[#77879B]">A edição não altera valor, data, conta nem o texto original do extrato.</p>
-                        <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditId(null)} className="rounded-xl border border-[#DCE5EF] bg-white px-4 py-2 text-xs font-semibold text-[#526B8B]">Cancelar</button><button type="button" onClick={saveEdit} className="rounded-xl bg-[#344D70] px-4 py-2 text-xs font-semibold text-white">Salvar e concluir</button></div>
+                        <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditId(null)} className="rounded-xl border border-[#DCE5EF] bg-white px-4 py-2 text-xs font-semibold text-[#526B8B]">Cancelar</button><button type="button" onClick={saveEdit} className="rounded-xl bg-[#344D70] px-4 py-2 text-xs font-semibold text-white">{editAsTransfer && editItem.type === "expense" ? "Confirmar transferência" : "Salvar e concluir"}</button></div>
                       </div>}
                     </div>
                   ))}               </div>
