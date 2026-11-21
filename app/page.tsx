@@ -1630,7 +1630,7 @@ if (amountCents <= 0) {
                     <div className="hidden md:block" />
                   </div>
                   {filteredTransactions.map((transaction) => (
-                    <div key={transaction.id} className={`border-b border-[#EDF0F4] py-3 last:border-0 ${editId === transaction.id ? "rounded-2xl border border-[#A7BBD6] bg-white/80 px-4 shadow-sm" : ""}`}>
+                    <div key={transaction.id} className={`my-2 rounded-2xl border px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_5px_18px_rgba(70,90,120,0.035)] backdrop-blur-xl transition-colors ${transaction.type === "expense" ? "border-rose-200/65 bg-gradient-to-br from-rose-100/55 via-rose-50/35 to-white/45" : transaction.type === "income" ? "border-emerald-200/65 bg-gradient-to-br from-emerald-100/55 via-emerald-50/35 to-white/45" : "border-slate-200/70 bg-white/45"} ${editId === transaction.id ? "ring-1 ring-[#A7BBD6] shadow-md" : ""}`}>
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <input type="checkbox" aria-label={`Selecionar lançamento ${transaction.id}`} checked={selectedTransactionIds.includes(transaction.id)} onChange={event => setSelectedTransactionIds(current => event.target.checked ? [...current, transaction.id] : current.filter(id => id !== transaction.id))} className="mt-1" />
                         <button type="button" disabled={isTransactionLocked(transaction.id)} aria-expanded={editId === transaction.id} onClick={() => editId === transaction.id ? setEditId(null) : startEdit(transaction)} className="min-w-0 flex-1 text-left">
