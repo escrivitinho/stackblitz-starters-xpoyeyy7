@@ -23,7 +23,7 @@ type Draft = Omit<CardEntry, "id">;
 
 function GlassSelect({ label, value, options, onChange, disabled = false }: {label:string;value:string;options:{value:string;label:string;detail?:string}[];onChange:(value:string)=>void;disabled?:boolean}) {
  const [open,setOpen]=useState(false); const [search,setSearch]=useState(""); const [active,setActive]=useState(0); const root=useRef<HTMLDivElement>(null);
- const normalized=(v:string)=>v.normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase();
+ const normalized=(v:string)=>v.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
  const shown=options.filter(o=>normalized(o.label+" "+(o.detail||"")).includes(normalized(search)));
  useEffect(()=>{if(!open)return;const close=(e:MouseEvent)=>{if(!root.current?.contains(e.target as Node)){setOpen(false);setSearch("");}};document.addEventListener("mousedown",close);return()=>document.removeEventListener("mousedown",close)},[open]);
  return <div ref={root} className="relative min-w-0"><span className="block text-xs text-[#64748B]">{label}</span>
