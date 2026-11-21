@@ -1704,16 +1704,22 @@ if (amountCents <= 0) {
                 <div className="rounded-2xl border border-dashed border-[#D5DFEA] bg-white/40 px-5 py-12 text-center">
                   <div className="text-3xl text-[#91A9C8]">⇄</div>
                   <h4 className="mt-3 font-medium text-[#43536A]">
-                    Nenhum lançamento encontrado
+                    Nenhum lançamento corresponde aos filtros
                   </h4>
                   <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-[#94A0AF]">
-                    Tente alterar os filtros ou cadastre uma nova receita, despesa ou transferência.
+                    Seus lançamentos continuam cadastrados. Ajuste a pesquisa abaixo ou limpe os filtros para vê-los novamente.
                   </p>
-                  <button
-                    onClick={() => setShowTransactionForm(true)}
-                    className="mt-5 rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white"
-                  >
-                    + Novo lançamento
+                  <label className="mx-auto mt-5 flex max-w-md flex-col gap-2 text-left text-xs font-semibold text-[#526B8B]">
+                    Filtrar descrição
+                    <input type="search" value={transactionColumnFilters.description}
+                      onChange={event => setTransactionColumnFilters(current => ({ ...current, description: event.target.value }))}
+                      placeholder="Digite ou apague a descrição pesquisada"
+                      className="w-full rounded-xl border border-white/90 bg-white/80 px-4 py-3 text-sm font-normal text-[#35445A] outline-none focus:border-[#A7BBD6]" />
+                  </label>
+                  <button type="button"
+                    onClick={() => { setTransactionColumnFilters({ date: "", description: "", category: "", amount: "" }); setTransactionTypeFilter("all"); setReconciliationFilter("all"); setTransactionMonthFilter(""); }}
+                    className="mt-4 rounded-xl bg-[#34383F] px-5 py-3 text-sm font-medium text-white">
+                    Limpar todos os filtros
                   </button>
                 </div>
               ) : (
