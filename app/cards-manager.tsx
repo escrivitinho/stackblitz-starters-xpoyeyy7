@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatCents } from "./lib/money";
 import type { Category } from "./categories-manager";
 import { classifyCardByDescription, type DescriptionRule } from "./description-rules";
@@ -20,6 +20,19 @@ export type CardEntry = {
 };
 
 type Draft = Omit<CardEntry, "id">;
+
+function GlassSelect({ label, value, options, onChange, disabled = false }: {label:string;value:string;options:{value:string;label:string;detail?:string}[];onChange:(value:string)=>void;disabled?:boolean}) {
+ const [open,setOpen]=useState(false); const [search,setSearch]=useState(""); const [active,setActive]=useState(0); const root=useRef<HTMLDivElement>(null);
+ const normalized=(v:string)=>v.normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase();
+ const shown=options.filter(o=>normalized(o.label+" "+(o.detail||"")).includes(normalized(search)));
+ useEffect(()=>{if(!open)return;const close=(e:MouseEvent)=>{if(!root.current?.contains(e.target as Node)){setOpen(false);setSearch("");}};document.addEventListener("mousedown",close);return()=>document.removeEventListener("mousedown",close)},[open]);
+ return <div ref={root} className="relative min-w-0"><span className="block text-xs text-[#64748B]">{label}</span>
+ <div className="mt-1 flex items-center rounded-xl border border-white/85 bg-white/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_5px_18px_rgba(80,110,150,0.07)] backdrop-blur-xl focus-within:ring-2 focus-within:ring-[#A7BBD6]">
+ <input disabled={disabled} role="combobox" aria-label={label} aria-expanded={open} aria-autocomplete="list" value={open?search:(options.find(o=>o.value===value)?.label||"")} placeholder="Pesquisar..." onFocus={()=>{setOpen(true);setSearch("");setActive(0)}} onChange={e=>{setSearch(e.target.value);setActive(0);setOpen(true)}} onKeyDown={e=>{if(e.key==="Escape"){setOpen(false);setSearch("");(e.target as HTMLInputElement).blur()}if(e.key==="ArrowDown"){e.preventDefault();setActive(i=>Math.min(i+1,shown.length-1))}if(e.key==="ArrowUp"){e.preventDefault();setActive(i=>Math.max(i-1,0))}if(e.key==="Enter"&&open&&shown[active]){e.preventDefault();onChange(shown[active].value);setOpen(false);setSearch("");(e.target as HTMLInputElement).blur()}}} className="min-w-0 w-full bg-transparent px-3 py-2.5 text-sm text-[#35445A] outline-none disabled:opacity-40"/>
+ <button type="button" disabled={disabled} aria-label={"Mostrar "+label} onClick={()=>{setOpen(!open);setSearch("");setActive(0)}} className="px-3 text-[#64748B]">⌄</button></div>
+ {open&&!disabled&&<div role="listbox" className="absolute left-0 right-0 top-full z-50 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-white/90 bg-[#F4F7FC]/95 p-1.5 shadow-[0_16px_45px_rgba(55,75,110,0.22)] backdrop-blur-2xl">{shown.length===0&&<p className="px-3 py-3 text-sm text-[#64748B]">Nenhuma opção encontrada</p>}{shown.map((o,i)=><button key={o.value} type="button" role="option" aria-selected={o.value===value} onMouseEnter={()=>setActive(i)} onClick={()=>{onChange(o.value);setOpen(false);setSearch("")}} className={`block w-full rounded-xl px-3 py-2 text-left transition-colors ${i===active?"bg-white/90 shadow-sm":"hover:bg-white/65"}`}><span className="block text-sm font-medium text-[#35445A]">{o.label}</span>{o.detail&&<span className="block text-xs text-[#718198]">{o.detail}</span>}</button>)}</div>}</div>
+}
+
 
 // Regras locais baseadas apenas em classificações confirmadas pelo usuário.
 // Não removemos números nem partes de nomes para evitar associar lojas diferentes.
@@ -342,7 +355,7 @@ export default function CardsManager({ entries, onChange, categories, descriptio
             const classified = kind === "purchase" && Boolean(category);
             const glassBackground = credit ? "linear-gradient(120deg, rgba(101,221,172,0.59), rgba(211,251,233,0.48))" : "linear-gradient(120deg, rgba(251,155,171,0.62), rgba(255,224,230,0.49))";
             const glassBorder = credit ? "rgba(16,185,129,0.55)" : "rgba(225,72,102,0.56)";
-            return <div key={entry.id} style={{background: kind === "payment" ? "rgba(255,255,255,0.40)" : glassBackground, borderColor: kind === "payment" ? "rgba(203,213,225,0.55)" : glassBorder}} className={`rounded-2xl border px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_5px_18px_rgba(70,90,120,0.035)] backdrop-blur-xl ${editing ? "ring-1 ring-[#A7BBD6]" : ""}`}>
+            return <div key={entry.id} style={{background: kind === "payment" ? "rgba(255,255,255,0.40)" : classified ? (credit ? "linear-gradient(120deg, rgba(167,243,208,0.20), rgba(236,253,245,0.18))" : "linear-gradient(120deg, rgba(254,205,211,0.22), rgba(255,240,242,0.19))") : glassBackground, borderColor: kind === "payment" ? "rgba(203,213,225,0.55)" : classified ? (credit ? "rgba(52,211,153,0.22)" : "rgba(244,114,136,0.22)") : glassBorder}} className={`rounded-2xl border px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_5px_18px_rgba(70,90,120,0.035)] backdrop-blur-xl ${editing ? "ring-1 ring-[#A7BBD6]" : ""}`}>
               <div className="grid grid-cols-1 gap-2 lg:grid-cols-[120px_100px_minmax(240px,2fr)_minmax(170px,1.2fr)_130px_130px] lg:gap-3">
                 <span className="inline-flex h-8 w-[116px] items-center justify-center rounded-lg border border-white/75 bg-white/55 px-2 text-xs font-semibold text-[#526B8B]">{kind === "payment" ? "Pagamento" : classified ? "Classificado" : "A tratar"}</span>
                 <span className="text-xs text-[#64748B] lg:pt-1">{entry.date.split("-").reverse().join("/")}</span>
@@ -357,9 +370,9 @@ export default function CardsManager({ entries, onChange, categories, descriptio
                   <button type="button" onClick={() => updateEntry(entry.id, { categoryId: suggestion.categoryId, subcategoryId: suggestion.subcategoryId })} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-[#294263] shadow-sm ring-1 ring-sky-200">Aplicar sugestão</button>
                 </div>}
                 <div className="grid gap-2 sm:grid-cols-3">
-                  <label className="text-xs text-[#64748B]">Tipo<select aria-label={"Tipo: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm" value={kind} onChange={e => updateEntry(entry.id, {kind:e.target.value as CardEntry["kind"], categoryId:undefined, subcategoryId:undefined})}><option value="purchase">Compra</option><option value="credit">Crédito / estorno</option><option value="payment">Pagamento da fatura</option></select></label>
-                  <label className="text-xs text-[#64748B]">Categoria<select disabled={kind !== "purchase"} aria-label={"Categoria: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm disabled:opacity-40" value={entry.categoryId ?? ""} onChange={e => updateEntry(entry.id,{categoryId:e.target.value || undefined,subcategoryId:undefined})}><option value="">Não classificada</option>{expenseCategories.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-                  <label className="text-xs text-[#64748B]">Subcategoria<select disabled={kind !== "purchase" || !category} aria-label={"Subcategoria: " + entry.description} className="mt-1 w-full rounded-xl border border-[#E2E8F0] bg-white p-2 text-sm disabled:opacity-40" value={entry.subcategoryId ?? ""} onChange={e => updateEntry(entry.id,{subcategoryId:e.target.value || undefined})}><option value="">Não selecionada</option>{category?.subcategories.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                  <GlassSelect label="Tipo" value={kind} options={[{value:"purchase",label:"Compra"},{value:"credit",label:"Crédito / estorno"},{value:"payment",label:"Pagamento da fatura"}]} onChange={value=>updateEntry(entry.id,{kind:value as CardEntry["kind"],categoryId:undefined,subcategoryId:undefined})}/>
+                  <GlassSelect label="Categoria" disabled={kind!=="purchase"} value={entry.categoryId??""} options={[{value:"",label:"Não classificada"},...expenseCategories.map(item=>({value:item.id,label:item.name}))]} onChange={value=>updateEntry(entry.id,{categoryId:value||undefined,subcategoryId:undefined})}/>
+                  <GlassSelect label="Subcategoria" disabled={kind!=="purchase"} value={entry.subcategoryId??""} options={[{value:"",label:"Não selecionada"},...(category ? category.subcategories.map(item=>({value:item.id,label:item.name})) : expenseCategories.flatMap(cat=>cat.subcategories.map(item=>({value:cat.id+"::"+item.id,label:item.name,detail:cat.name}))))]} onChange={value=>{if(value.includes("::")){const [catId,subId]=value.split("::");updateEntry(entry.id,{categoryId:catId,subcategoryId:subId})}else updateEntry(entry.id,{subcategoryId:value||undefined})}}/>
                 </div>
                 <div className="flex justify-end"><button type="button" onClick={() => setEditingEntryId(null)} className="rounded-lg border border-white/80 bg-white/65 px-4 py-2 text-xs font-semibold text-[#526B8B]">Concluir edição</button></div>
               </div>}
