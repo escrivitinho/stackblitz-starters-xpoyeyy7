@@ -1820,31 +1820,45 @@ if (amountCents <= 0) {
               <h3 className="font-semibold text-[#26364D]">Histórico de movimentações</h3>
               <p className="mt-1 text-xs text-[#94A0AF]">Entradas, saídas e transferências desta conta</p>
 
-              {accountTransactions.length === 0 ? (
-                <p className="py-10 text-center text-sm text-[#94A0AF]">
-                  Nenhuma movimentação registrada nesta conta.
-                </p>
-              ) : (
-                <div className="mt-4 space-y-1">
-                  {accountTransactions.map((transaction) => (
-                    <div key={transaction.id} className="flex flex-wrap justify-between gap-3 border-b border-[#EDF0F4] py-4 last:border-0">
-                      <div>
-                        <p className="text-sm font-medium text-[#35445A]">{transaction.description}</p>
-                        <p className="mt-1 text-xs text-[#94A0AF]">
-                          {getCategoryNames(transaction).group} · {displayDate(transaction.date)}
-                        </p>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-[#64748B]">{accountTransactions.length} movimentação(ões)</span>
+                <button type="button" onClick={() => setSelectedTransactionIds(accountTransactions.filter(item=>!isTransactionLocked(item.id)).map(item=>item.id))} className="rounded-xl border border-white/90 bg-white/65 px-3 py-2 text-xs text-[#526B8B]">Selecionar a tratar</button>
+                <button type="button" onClick={() => setSelectedTransactionIds([])} className="rounded-xl border border-white/90 bg-white/65 px-3 py-2 text-xs text-[#526B8B]">Limpar seleção</button>
+              </div>
+              <div className="sticky top-0 z-40 mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-white/90 bg-[#F1F3F8]/95 px-3 py-2 text-xs shadow-md backdrop-blur-2xl">
+                <span className="text-[#526B8B]">{accountTransactions.filter(item=>selectedTransactionIds.includes(item.id)).length} selecionado(s)</span>
+                <button type="button" disabled={!accountTransactions.some(item=>selectedTransactionIds.includes(item.id)&&!isTransactionLocked(item.id))} onClick={() => setTransactionLock(accountTransactions.filter(item=>selectedTransactionIds.includes(item.id)&&!isTransactionLocked(item.id)).map(item=>item.id),true)} className="rounded-lg bg-white/90 px-3 py-2 font-semibold text-[#526B8B] disabled:opacity-40">Conciliar</button>
+                <button type="button" disabled={!accountTransactions.some(item=>selectedTransactionIds.includes(item.id)&&isTransactionLocked(item.id))} onClick={() => setTransactionLock(accountTransactions.filter(item=>selectedTransactionIds.includes(item.id)&&isTransactionLocked(item.id)).map(item=>item.id),false)} className="rounded-lg bg-white/90 px-3 py-2 font-semibold text-[#526B8B] disabled:opacity-40">Reabrir selecionados</button>
+              </div>
+              <div className="sticky top-12 z-30 mt-3 grid grid-cols-[28px_90px_minmax(0,2fr)_minmax(0,1fr)_105px] gap-3 rounded-xl border border-white/80 bg-[#F1F3F8]/95 px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-[#8494A8] backdrop-blur-2xl md:grid-cols-[28px_110px_105px_minmax(0,2fr)_minmax(0,1fr)_105px]">
+                <span>✓</span><span>Situação</span><span className="hidden md:block">Data</span><span>Descrição</span><span>Categoria</span><span className="text-right">Valor</span>
+              </div>
+              {accountTransactions.length===0 ? <p className="py-10 text-center text-sm text-[#94A0AF]">Nenhuma movimentação registrada nesta conta.</p> :
+                <div className="mt-2 space-y-1">
+                  {accountTransactions.map(transaction => {
+                    const locked=isTransactionLocked(transaction.id);
+                    const incoming=transaction.type==="income"||(transaction.type==="transfer"&&transaction.toAccountId===selectedAccount.id);
+                    const names=getCategoryNames(transaction);
+                    return <div key={transaction.id} className={`relative rounded-2xl border px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-xl ${editId===transaction.id?"z-20":""} ${incoming?(locked?"border-emerald-200/50 bg-emerald-100/20":"border-emerald-300/80 bg-emerald-200/55"):(locked?"border-rose-200/50 bg-rose-100/20":"border-rose-300/80 bg-rose-200/55")}`}>
+                      <div className="grid grid-cols-[28px_90px_minmax(0,2fr)_minmax(0,1fr)_105px] items-start gap-3 md:grid-cols-[28px_110px_105px_minmax(0,2fr)_minmax(0,1fr)_105px]">
+                        <input aria-label="Selecionar lançamento" type="checkbox" checked={selectedTransactionIds.includes(transaction.id)} onChange={event=>setSelectedTransactionIds(current=>event.target.checked?[...current,transaction.id]:current.filter(id=>id!==transaction.id))} className="mt-1" />
+                        <div><button type="button" onClick={()=>locked?setTransactionLock([transaction.id],false):setTransactionLock([transaction.id],true)} className="w-full rounded-lg border border-white/80 bg-white/60 px-2 py-2 text-[11px] font-semibold text-[#526B8B]">{locked?"🔒 Conciliado":"A tratar"}</button></div>
+                        <span className="hidden text-xs text-[#64748B] md:block">{displayDate(transaction.date)}</span>
+                        <button type="button" onClick={()=>{if(locked)return;editId===transaction.id?setEditId(null):startEdit(transaction)}} className="min-w-0 break-words text-left text-sm font-medium text-[#35445A]">{transaction.displayDescription||transaction.description}<span className="mt-1 block text-xs font-normal text-[#64748B] md:hidden">{displayDate(transaction.date)}</span></button>
+                        <span className="break-words text-xs leading-5 text-[#64748B]">{names.group} {names.subcategory?"→ "+names.subcategory:""}</span>
+                        <div className="text-right"><span className={`text-sm font-semibold ${incoming?"text-emerald-700":"text-[#C35B58]"}`}>{incoming?"+":"−"}{money(transaction.amountCents)}</span>{!locked&&<button type="button" onClick={()=>editId===transaction.id?setEditId(null):startEdit(transaction)} className="ml-1 text-xs text-[#64748B]" aria-label="Editar lançamento">⌄</button>}</div>
                       </div>
-                      <p className={`text-sm font-semibold ${
-                        transaction.type === "income" ? "text-emerald-700" :
-                        transaction.type === "expense" ? "text-[#B65D58]" : "text-[#526B8B]"
-                      }`}>
-                        {transaction.type === "income" ? "+" : transaction.type === "expense" ? "−" : ""}
-                        {money(transaction.amountCents)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
+                      {editId===transaction.id&&!locked&&<div className="mt-4 space-y-4 border-t border-white/60 pt-4">
+                        <label className="block text-xs text-[#64748B]">Descrição exibida<input value={editDescription} onChange={event=>setEditDescription(event.target.value)} className="mt-1 w-full rounded-xl border border-white/80 bg-white/75 p-3 text-sm text-[#35445A]" /></label>
+                        {transaction.type==="income"&&<div className="flex gap-2">{["Receita","Reembolso"].map((label,index)=><button key={label} type="button" onClick={()=>{setEditIsReimbursement(index===1);setEditCategoryId("");setEditSubcategoryId("");}} className={`rounded-xl border px-4 py-2 text-xs font-semibold ${editIsReimbursement===(index===1)?"bg-[#344D70] text-white":"bg-white/65 text-[#526B8B]"}`}>{label}</button>)}</div>}
+                        {transaction.type!=="transfer"&&<div className="grid gap-3 md:grid-cols-2"><GlassCategoryPicker categories={editCategories} categoryId={editCategoryId} onPick={id=>{setEditCategoryId(id);setEditSubcategoryId("");}}/><GlassSubcategoryPicker categories={editCategories} categoryId={editCategoryId} subcategoryId={editSubcategoryId} onPick={(cat,sub)=>{setEditCategoryId(cat);setEditSubcategoryId(sub);}}/></div>}
+                        <label className="block text-xs text-[#64748B]">Por conta de quem? (opcional)<input value={editPaidFor} onChange={event=>setEditPaidFor(event.target.value)} className="mt-1 w-full rounded-xl border border-white/80 bg-white/75 p-3 text-sm text-[#35445A]" /></label>
+                        <div className="flex justify-end gap-2"><button type="button" onClick={()=>setEditId(null)} className="rounded-xl bg-white/70 px-4 py-2 text-xs">Cancelar</button><button type="button" onClick={saveEdit} className="rounded-xl bg-[#344D70] px-4 py-2 text-xs font-semibold text-white">Salvar e conciliar</button></div>
+                      </div>}
+                    </div>;
+                  })}
+                </div>}
+
             </div>
           </div>
         )}
