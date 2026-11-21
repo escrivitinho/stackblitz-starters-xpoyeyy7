@@ -209,6 +209,7 @@ function Home() {
   const cloudBlocked = useRef(false);
   const [active, setActive] = useState("Visão geral");
   const [launchMenuOpen, setLaunchMenuOpen] = useState(false);
+  const [showColumnFilters, setShowColumnFilters] = useState(false);
 
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
   const [transactions, setTransactions] =
@@ -1514,6 +1515,12 @@ if (amountCents <= 0) {
                 <p className="mt-1 text-xs text-[#94A0AF]">
                   Exibindo {filteredTransactions.length} de {transactions.length} movimentação(ões)
                 </p>
+                <div className="mt-3 flex justify-end">
+                  <button type="button" aria-expanded={showColumnFilters} onClick={() => setShowColumnFilters((visible) => !visible)}
+                    className="rounded-xl border border-white/90 bg-white/70 px-4 py-2 text-xs font-semibold text-[#526B8B] shadow-sm transition hover:bg-white">
+                    {showColumnFilters ? "Ocultar filtros avançados" : "Mostrar filtros avançados"}
+                  </button>
+                </div>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap gap-2">
                     {([
@@ -1563,7 +1570,7 @@ if (amountCents <= 0) {
                           {({date:"Data",description:"Descrição",category:"Categoria / Subcategoria",amount:"Valor"} as const)[column]}
                           <span aria-hidden="true">{transactionSort === column ? (transactionSortDirection === "asc" ? "↑" : "↓") : "↕"}</span>
                         </button>
-                        <input type="text" value={transactionColumnFilters[column]} onChange={event => setTransactionColumnFilters(current => ({ ...current, [column]: event.target.value }))} placeholder={column === "date" ? "dd/mm/aaaa" : column === "amount" ? "Ex.: 25,90" : "Filtrar..."} aria-label={`Filtrar ${column}`} className="w-full min-w-0 rounded-lg border border-[#DDE5EF] bg-white/80 px-2 py-2 text-xs font-normal text-[#35445A] outline-none focus:border-blue-400" />
+                        {showColumnFilters && <input type="text" value={transactionColumnFilters[column]} onChange={event => setTransactionColumnFilters(current => ({ ...current, [column]: event.target.value }))} placeholder={column === "date" ? "dd/mm/aaaa" : column === "amount" ? "Ex.: 25,90" : "Filtrar..."} aria-label={`Filtrar ${column}`} className="w-full min-w-0 rounded-lg border border-[#DDE5EF] bg-white/80 px-2 py-2 text-xs font-normal text-[#35445A] outline-none focus:border-blue-400" />}
                       </div>
                     ))}
                     <div className="hidden md:block" />
