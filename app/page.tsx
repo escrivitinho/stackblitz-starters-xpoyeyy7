@@ -266,6 +266,10 @@ function Home() {
     useState<Transaction[]>(initialTransactions);
   const [lockedTransactionIds, setLockedTransactionIds] = useState<number[]>([]);
   const [selectedTransactionIds, setSelectedTransactionIds] = useState<number[]>([]);
+  const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false);
+  const [bulkCategoryId, setBulkCategoryId] = useState("");
+  const [bulkSubcategoryId, setBulkSubcategoryId] = useState("");
+
   const [reconciliationFilter, setReconciliationFilter] = useState<"all" | "open" | "locked">("all");
   const isTransactionLocked = (id: number) => lockedTransactionIds.includes(id);
   function pairSelectedAsTransfer() {
@@ -299,6 +303,21 @@ function Home() {
     setLockedTransactionIds(current => Array.from(new Set([...current, outgoing.id, incoming.id])));
     setSelectedTransactionIds([]);
     setEditId(null);
+  }
+  function applyBulkCategory() {
+    const category = categories.find(item => item.id === bulkCategoryId);
+    const subcategory = category?.subcategories.find(item => item.id === bulkSubcategoryId);
+    if (!category || !subcategory) { window.alert("Selecione uma categoria e uma subcategoria."); return; }
+    const eligible = transactions.filter(item => selectedTransactionIds.includes(item.id) && !lockedTransactionIds.includes(item.id) && !item.internalTransferPairId && item.type === category.type && item.type !== "transfer");
+    if (!eligible.length) { window.alert("Nenhum lançamento selecionado pode receber esta classificação. Confira o tipo e se estão conciliados."); return; }
+    const excluded = selectedTransactionIds.length - eligible.length;
+    if (!window.confirm(`Aplicar "${category.name} → ${subcategory.name}" a ${eligible.length} lançamento(s)?${excluded ? ` ${excluded} lançamento(s) serão ignorados por estarem bloqueados, vinculados ou serem de outro tipo.` : ""}`)) return;
+    const ids = new Set(eligible.map(item => item.id));
+    setTransactions(current => current.map(item => ids.has(item.id) ? { ...item, categoryId: category.id, subcategoryId: subcategory.id, group: category.name, subcategory: subcategory.name } : item));
+    setSelectedTransactionIds([]);
+    setBulkCategoryOpen(false);
+    setBulkCategoryId("");
+    setBulkSubcategoryId("");
   }
   function setTransactionLock(ids: number[], locked: boolean) {
     setLockedTransactionIds(current => locked ? Array.from(new Set([...current, ...ids])) : current.filter(id => !ids.includes(id)));
@@ -1728,8 +1747,28 @@ if (amountCents <= 0) {
                     <label className="flex items-center gap-2"><input type="checkbox" checked={filteredTransactions.length > 0 && filteredTransactions.every(t => selectedTransactionIds.includes(t.id))} onChange={event => setSelectedTransactionIds(event.target.checked ? filteredTransactions.map(t => t.id) : [])} /> Selecionar visíveis</label>
                     <span>{selectedTransactionIds.length} selecionado(s)</span>
                     <button type="button" disabled={!selectedTransactionIds.some(id => !lockedTransactionIds.includes(id))} onClick={() => setTransactionLock(selectedTransactionIds.filter(id => !lockedTransactionIds.includes(id)), true)} className="rounded-lg bg-white/90 px-3 py-1.5 font-semibold disabled:opacity-40">Conciliar</button>
-                    <button type="button" disabled={!selectedTransactionIds.some(id => lockedTransactionIds.includes(id))} onClick={() => setTransactionLock(selectedTransactionIds.filter(id => lockedTransactionIds.includes(id)), false)} className="rounded-lg bg-white/90 px-3 py-1.5 font-semibold disabled:opacity-40">Reabrir selecionados</button>\n                <button type="button" disabled={selectedTransactionIds.length !== 2} onClick={pairSelectedAsTransfer} className="rounded-lg border border-sky-200 bg-sky-50/85 px-3 py-2 font-semibold text-[#344D70] disabled:opacity-40">Vincular como transferência</button>
+                    <button type="button" disabled={!selectedTransactionIds.some(id => lockedTransactionIds.includes(id))} onClick={() => setTransactionLock(selectedTransactionIds.filter(id => lockedTransactionIds.includes(id)), false)} className="rounded-lg bg-white/90 px-3 py-1.5 font-semibold disabled:opacity-40">Reabrir selecionados</button>\n                <button type="button" disabled={!selectedTransactionIds.length} onClick={() => setBulkCategoryOpen(open => !open)} className="rounded-lg border border-indigo-200 bg-indigo-50/85 px-3 py-2 font-semibold text-[#344D70] disabled:opacity-40">Editar categoria em lote</button>
+                <button type="button" disabled={selectedTransactionIds.length !== 2} onClick={pairSelectedAsTransfer} className="rounded-lg border border-sky-200 bg-sky-50/85 px-3 py-2 font-semibold text-[#344D70] disabled:opacity-40">Vincular como transferência</button>
                   </div>
+                  {bulkCategoryOpen && (
+                    <div className="relative z-40 mb-3 flex flex-wrap items-end gap-3 rounded-2xl border border-white/90 bg-white/85 p-4 shadow-lg backdrop-blur-2xl">
+                      <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-xs font-semibold text-[#526B8B]">Categoria
+                        <select value={bulkCategoryId} onChange={event => { setBulkCategoryId(event.target.value); setBulkSubcategoryId(""); }} className="rounded-xl border border-[#DDE5EF] bg-white px-3 py-2 text-sm">
+                          <option value="">Selecione</option>
+                          {categories.filter(category => category.type !== "transfer").map(category => <option key={category.id} value={category.id}>{category.type === "income" ? "Receita" : "Despesa"} · {category.name}</option>)}
+                        </select>
+                      </label>
+                      <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-xs font-semibold text-[#526B8B]">Subcategoria
+                        <select value={bulkSubcategoryId} onChange={event => setBulkSubcategoryId(event.target.value)} className="rounded-xl border border-[#DDE5EF] bg-white px-3 py-2 text-sm">
+                          <option value="">Selecione</option>
+                          {categories.find(category => category.id === bulkCategoryId)?.subcategories.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
+                        </select>
+                      </label>
+                      <button type="button" onClick={applyBulkCategory} disabled={!bulkCategoryId || !bulkSubcategoryId} className="rounded-xl bg-[#344D70] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">Aplicar aos selecionados</button>
+                      <button type="button" onClick={() => setBulkCategoryOpen(false)} className="rounded-xl border border-[#DDE5EF] bg-white px-4 py-2.5 text-sm">Cancelar</button>
+                      <p className="w-full text-xs text-[#718198]">Lançamentos conciliados, transferências vinculadas e tipos incompatíveis não serão alterados.</p>
+                    </div>
+                  )}
                   <div className="sticky top-12 z-30 mb-2 hidden grid-cols-[32px_135px_105px_minmax(230px,2fr)_minmax(160px,1.2fr)_minmax(125px,1fr)_145px] items-start gap-3 rounded-xl border border-white/75 bg-[#F1F3F8]/95 px-4 py-3 shadow-[0_6px_20px_rgba(65,85,115,0.10)] backdrop-blur-2xl lg:grid">
                     <span aria-label="Seleção" />
                     <span className="text-xs font-semibold uppercase tracking-wide text-[#8190A4]">Situação</span>
