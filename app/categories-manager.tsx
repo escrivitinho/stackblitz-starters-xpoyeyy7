@@ -313,8 +313,8 @@ export default function CategoriesManager({ categories, onChange, usedCategoryId
                       )}
                     </div>
                     <div className="ml-2 mt-3 space-y-2 border-l-2 border-[#DCE5EF] pl-3">
-                      {category.subcategories.length > 0 ? category.subcategories.map((item) => (
-                        <div key={item.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5">
+                      {category.subcategories.length > 0 ? category.subcategories.map((item, index) => (
+                        <div key={item.id} className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 transition-colors ${index % 2 === 0 ? "border-white/80 bg-white/75" : "border-[#D9E5F3]/75 bg-[#E3ECF7]/75"} hover:border-[#B6CBE4] hover:bg-[#D6E6F7]/90` }>
                           <span className="text-xs text-[#A4B3C5]">↳</span>
                           {editingSubcategory?.categoryId === category.id && editingSubcategory.subcategoryId === item.id ? (
                             <div className="min-w-0 flex-1 space-y-2">
