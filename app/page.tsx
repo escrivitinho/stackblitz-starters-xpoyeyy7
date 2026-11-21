@@ -5,6 +5,31 @@ import MoneoAuthGate, { useMoneoToken, useMoneoSignOut } from "./moneo-auth-gate
 
 import { useEffect, useRef, useState } from "react";
 import CategoriesManager, { type Category } from "./categories-manager";
+
+function GlassSubcategoryPicker({ categories, categoryId, subcategoryId, onPick }: { categories: Category[]; categoryId: string; subcategoryId: string; onPick: (categoryId: string, subcategoryId: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(0);
+  const root = useRef<HTMLDivElement>(null);
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+  const options = categories.flatMap(category => category.subcategories.map(subcategory => ({ category, subcategory })));
+  const selected = options.find(item => item.category.id === categoryId && item.subcategory.id === subcategoryId);
+  const filtered = options.filter(item => (!query || normalize(item.subcategory.name + " " + item.category.name).includes(normalize(query))) && (query || !categoryId || item.category.id === categoryId));
+  const choose = (item: typeof options[number]) => { onPick(item.category.id, item.subcategory.id); setQuery(""); setOpen(false); setFocused(0); };
+  useEffect(() => { if (!open) return; const listener = (event: MouseEvent) => { if (!root.current?.contains(event.target as Node)) { setOpen(false); setQuery(""); } }; document.addEventListener("mousedown", listener); return () => document.removeEventListener("mousedown", listener); }, [open]);
+  return <div ref={root} className="relative space-y-1">
+    <label htmlFor="glass-subcategory-search" className="block text-xs text-[#64748B]">Subcategoria</label>
+    <div className="flex items-center rounded-xl border border-white/85 bg-white/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_5px_18px_rgba(80,110,150,0.07)] backdrop-blur-xl focus-within:ring-2 focus-within:ring-[#A7BBD6]">
+      <input id="glass-subcategory-search" role="combobox" aria-expanded={open} aria-controls="glass-subcategory-options" aria-autocomplete="list" value={open ? query : (selected?.subcategory.name ?? "")} placeholder="Pesquisar subcategoria..." onFocus={() => {setOpen(true);setQuery("");setFocused(0);}} onChange={event => {setQuery(event.target.value);setOpen(true);setFocused(0);}} onKeyDown={event => {if (event.key === "Escape") {setOpen(false);setQuery("");(event.target as HTMLInputElement).blur();} if (event.key === "ArrowDown") {event.preventDefault();setFocused(index => Math.min(index+1,filtered.length-1));} if (event.key === "ArrowUp") {event.preventDefault();setFocused(index => Math.max(index-1,0));} if (event.key === "Enter" && open && filtered[focused]) {event.preventDefault();choose(filtered[focused]);(event.target as HTMLInputElement).blur();}}} className="min-w-0 w-full bg-transparent px-3 py-2.5 text-sm text-[#35445A] outline-none placeholder:text-[#94A3B8]" />
+      <button type="button" aria-label="Mostrar subcategorias" onClick={() => {setOpen(!open);setQuery("");setFocused(0);}} className="px-3 text-[#64748B]">⌄</button>
+    </div>
+    {open && <div id="glass-subcategory-options" role="listbox" className="absolute left-0 right-0 top-full z-50 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-white/90 bg-[#F4F7FC]/95 p-1.5 shadow-[0_16px_45px_rgba(55,75,110,0.22)] backdrop-blur-2xl">
+      {filtered.length === 0 && <p className="px-3 py-3 text-sm text-[#64748B]">Nenhuma subcategoria encontrada.</p>}
+      {filtered.map((item,index) => <button key={item.category.id + ":" + item.subcategory.id} type="button" role="option" aria-selected={selected?.category.id === item.category.id && selected?.subcategory.id === item.subcategory.id} onMouseEnter={() => setFocused(index)} onClick={() => choose(item)} className={`flex w-full flex-col rounded-xl px-3 py-2 text-left transition-colors ${index === focused ? "bg-white/90 shadow-sm" : "hover:bg-white/65"}`}><span className="text-sm font-medium text-[#35445A]">{item.subcategory.name}</span><span className="text-xs text-[#718198]">{item.category.name}</span></button>)}
+    </div>}
+  </div>;
+}
+
 import CardsManager, { type CardEntry } from "./cards-manager";
 import CardInvoiceHistory from "./card-invoice-history";
 import DriveSettings from "./drive-settings";
@@ -1687,7 +1712,7 @@ if (amountCents <= 0) {
                         </div>}
                         {editItem.type !== "transfer" && !editAsTransfer && <div className="grid gap-3 sm:grid-cols-2">
                           <label className="block space-y-1"><span className="text-xs text-[#64748B]">Categoria</span><select value={editCategoryId} onChange={(event) => {setEditCategoryId(event.target.value);setEditSubcategoryId("");}} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm"><option value="">Não classificada</option>{editCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-                          <label className="block space-y-1"><span className="text-xs text-[#64748B]">Subcategoria</span><select disabled={!editCategoryId} value={editSubcategoryId} onChange={(event) => setEditSubcategoryId(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm disabled:opacity-40"><option value="">Não selecionada</option>{editCategory?.subcategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                          <GlassSubcategoryPicker categories={editCategories} categoryId={editCategoryId} subcategoryId={editSubcategoryId} onPick={(categoryId, subcategoryId) => {setEditCategoryId(categoryId);setEditSubcategoryId(subcategoryId);}} />
                         </div>}
                         <label className="block space-y-1"><span className="text-xs text-[#64748B]">Por conta de quem? (opcional)</span><input value={editPaidFor} onChange={(event) => setEditPaidFor(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm" /></label>
                         <p className="text-xs text-[#77879B]">A edição não altera valor, data, conta nem o texto original do extrato.</p>
