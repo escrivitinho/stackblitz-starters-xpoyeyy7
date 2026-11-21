@@ -6,6 +6,30 @@ import MoneoAuthGate, { useMoneoToken, useMoneoSignOut } from "./moneo-auth-gate
 import { useEffect, useRef, useState } from "react";
 import CategoriesManager, { type Category } from "./categories-manager";
 
+function GlassCategoryPicker({ categories, categoryId, onPick }: { categories: Category[]; categoryId: string; onPick: (categoryId: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(0);
+  const root = useRef<HTMLDivElement>(null);
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+  const selected = categories.find(item => item.id === categoryId);
+  const filtered = categories.filter(item => normalize(item.name).includes(normalize(query)));
+  const choose = (id: string) => { onPick(id); setQuery(""); setOpen(false); setFocused(0); };
+  useEffect(() => { if (!open) return; const listener = (event: MouseEvent) => { if (!root.current?.contains(event.target as Node)) { setOpen(false); setQuery(""); } }; document.addEventListener("mousedown", listener); return () => document.removeEventListener("mousedown", listener); }, [open]);
+  return <div ref={root} className="relative min-w-0 space-y-1">
+    <label htmlFor="glass-category-search" className="block text-xs text-[#64748B]">Categoria</label>
+    <div className="flex items-center rounded-xl border border-white/85 bg-white/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_5px_18px_rgba(80,110,150,0.07)] backdrop-blur-xl focus-within:ring-2 focus-within:ring-[#A7BBD6]">
+      <input id="glass-category-search" role="combobox" aria-expanded={open} aria-controls="glass-category-options" aria-autocomplete="list" value={open ? query : (selected?.name ?? "")} placeholder="Pesquisar categoria..." onFocus={() => {setOpen(true);setQuery("");setFocused(0);}} onChange={event => {setQuery(event.target.value);setOpen(true);setFocused(0);}} onKeyDown={event => {if (event.key === "Escape") {setOpen(false);setQuery("");(event.target as HTMLInputElement).blur();} if (event.key === "ArrowDown") {event.preventDefault();setFocused(index => Math.min(index+1,filtered.length-1));} if (event.key === "ArrowUp") {event.preventDefault();setFocused(index => Math.max(index-1,0));} if (event.key === "Enter" && open && filtered[focused]) {event.preventDefault();choose(filtered[focused].id);(event.target as HTMLInputElement).blur();}}} className="min-w-0 w-full bg-transparent px-3 py-2.5 text-sm text-[#35445A] outline-none placeholder:text-[#94A3B8]" />
+      <button type="button" aria-label="Mostrar categorias" onClick={() => {setOpen(!open);setQuery("");setFocused(0);}} className="px-3 text-[#64748B]">⌄</button>
+    </div>
+    {open && <div id="glass-category-options" role="listbox" className="absolute left-0 right-0 top-full z-50 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-white/90 bg-[#F4F7FC]/95 p-1.5 shadow-[0_16px_45px_rgba(55,75,110,0.22)] backdrop-blur-2xl">
+      <button type="button" role="option" aria-selected={!categoryId} onClick={() => choose("")} className="w-full rounded-xl px-3 py-2 text-left text-sm text-[#526B8B] hover:bg-white/85">Não classificada</button>
+      {filtered.length === 0 && <p className="px-3 py-3 text-sm text-[#64748B]">Nenhuma categoria encontrada.</p>}
+      {filtered.map((item,index) => <button key={item.id} type="button" role="option" aria-selected={item.id === categoryId} onMouseEnter={() => setFocused(index)} onClick={() => choose(item.id)} className={`block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-[#35445A] transition-colors ${index === focused ? "bg-white/90 shadow-sm" : "hover:bg-white/65"}`}>{item.name}</button>)}
+    </div>}
+  </div>;
+}
+
 function GlassSubcategoryPicker({ categories, categoryId, subcategoryId, onPick }: { categories: Category[]; categoryId: string; subcategoryId: string; onPick: (categoryId: string, subcategoryId: string) => void }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -1711,7 +1735,7 @@ if (amountCents <= 0) {
                           {editTransferError && <p role="alert" className="text-xs font-semibold text-rose-700">{editTransferError}</p>}
                         </div>}
                         {editItem.type !== "transfer" && !editAsTransfer && <div className="grid gap-3 sm:grid-cols-2">
-                          <label className="block space-y-1"><span className="text-xs text-[#64748B]">Categoria</span><select value={editCategoryId} onChange={(event) => {setEditCategoryId(event.target.value);setEditSubcategoryId("");}} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm"><option value="">Não classificada</option>{editCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                          <GlassCategoryPicker categories={editCategories} categoryId={editCategoryId} onPick={(categoryId) => {setEditCategoryId(categoryId);setEditSubcategoryId("");}} />
                           <GlassSubcategoryPicker categories={editCategories} categoryId={editCategoryId} subcategoryId={editSubcategoryId} onPick={(categoryId, subcategoryId) => {setEditCategoryId(categoryId);setEditSubcategoryId(subcategoryId);}} />
                         </div>}
                         <label className="block space-y-1"><span className="text-xs text-[#64748B]">Por conta de quem? (opcional)</span><input value={editPaidFor} onChange={(event) => setEditPaidFor(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm" /></label>
