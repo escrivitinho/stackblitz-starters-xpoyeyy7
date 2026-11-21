@@ -336,12 +336,13 @@ function Home() {
   const [editSubcategoryId, setEditSubcategoryId] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editPaidFor, setEditPaidFor] = useState("");
+  const [editIsReimbursement, setEditIsReimbursement] = useState(false);
   const [editAsTransfer, setEditAsTransfer] = useState(false);
   const [editTransferDestination, setEditTransferDestination] = useState("");
   const [editTransferMatchingIncome, setEditTransferMatchingIncome] = useState("");
   const [editTransferError, setEditTransferError] = useState("");
   const editItem = transactions.find((item) => item.id === editId);
-  const editCategories = categories.filter((item) => item.type === (editItem?.type === "income" ? "income" : "expense"));
+  const editCategories = categories.filter((item) => item.type === (editItem?.type === "income" && !editIsReimbursement ? "income" : "expense"));
   const editCategory = editCategories.find((item) => item.id === editCategoryId);
   function startEdit(item: Transaction) {
     if (isTransactionLocked(item.id)) return;
@@ -350,6 +351,7 @@ function Home() {
     setEditSubcategoryId(item.subcategoryId || "");
     setEditDescription(item.displayDescription || item.description);
     setEditPaidFor(item.paidFor || "");
+    setEditIsReimbursement(item.type === "income" && item.isReimbursement === true);
     setEditAsTransfer(item.type === "transfer");
     setEditTransferDestination(item.type === "transfer" ? String(item.toAccountId) : "");
     setEditTransferMatchingIncome("");
@@ -380,6 +382,7 @@ function Home() {
     const subcategory = category?.subcategories.find((item) => item.id === editSubcategoryId);
     setTransactions((current) => current.map((item) => item.id === editId && !lockedTransactionIds.includes(item.id) ? { ...item,
       displayDescription: editDescription.trim() && editDescription.trim() !== item.description ? editDescription.trim() : undefined, paidFor: editPaidFor.trim(),
+      isReimbursement: item.type === "income" ? editIsReimbursement : false,
       categoryId: category?.id, subcategoryId: subcategory?.id,
       group: category?.name || item.group, subcategory: subcategory?.name || (category ? "" : item.subcategory)
     } : item));
@@ -1651,6 +1654,8 @@ if (amountCents <= 0) {
                       </div>
                       {editId === transaction.id && editItem && !isTransactionLocked(transaction.id) && <div className="mt-4 space-y-3 border-t border-[#E5EAF0] pt-4">
                         <label className="block space-y-1"><span className="text-xs text-[#64748B]">Descrição exibida</span><input value={editDescription} onChange={(event) => setEditDescription(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm" /></label>
+                        {editItem.type === "income" && <div className="flex flex-wrap gap-2" role="group" aria-label="Classificação da entrada">{([{value:false,label:"Receita"},{value:true,label:"Reembolso"}] as const).map(option => <button key={option.label} type="button" aria-pressed={editIsReimbursement === option.value} onClick={() => { if (editIsReimbursement !== option.value) { setEditIsReimbursement(option.value); setEditCategoryId(""); setEditSubcategoryId(""); } }} className={`rounded-xl border px-4 py-2 text-sm font-semibold transition-colors ${editIsReimbursement === option.value ? "border-[#9DB4D2] bg-[#344D70] text-white" : "border-white/80 bg-white/60 text-[#526B8B]"}`}>{option.label}</button>)}</div>}
+                        {editItem.type === "income" && editIsReimbursement && <p className="text-xs text-[#64748B]">Reembolso reduz o total de despesas na categoria selecionada, sem alterar a entrada bancária ou o saldo da conta.</p>}
                         {editItem.type === "expense" && <label className="flex items-center gap-2 rounded-xl border border-[#DCE5EF] bg-white/70 p-3 text-sm text-[#35445A]"><input type="checkbox" checked={editAsTransfer} onChange={event => { setEditAsTransfer(event.target.checked); setEditTransferError(""); }} /> Reclassificar como transferência entre minhas contas</label>}
                         {editItem.type === "expense" && editAsTransfer && <div className="space-y-3 rounded-xl border border-[#DCE5EF] bg-white/65 p-3">
                           <label className="block space-y-1"><span className="text-xs text-[#64748B]">Conta de destino</span><select value={editTransferDestination} onChange={event => {setEditTransferDestination(event.target.value);setEditTransferMatchingIncome("");setEditTransferError("");}} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm"><option value="">Selecione a conta</option>{accounts.filter(account => account.id !== editItem.accountId).map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>
