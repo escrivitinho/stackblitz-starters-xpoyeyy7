@@ -214,6 +214,15 @@ function Home() {
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
   const [transactions, setTransactions] =
     useState<Transaction[]>(initialTransactions);
+  const [lockedTransactionIds, setLockedTransactionIds] = useState<number[]>([]);
+  const [selectedTransactionIds, setSelectedTransactionIds] = useState<number[]>([]);
+  const [reconciliationFilter, setReconciliationFilter] = useState<"all" | "open" | "locked">("all");
+  const isTransactionLocked = (id: number) => lockedTransactionIds.includes(id);
+  function setTransactionLock(ids: number[], locked: boolean) {
+    setLockedTransactionIds(current => locked ? Array.from(new Set([...current, ...ids])) : current.filter(id => !ids.includes(id)));
+    setSelectedTransactionIds([]);
+    setEditId(null);
+  }
   const [categories, setCategories] = useState<Category[]>(mergeExcelCategories(initialCategories));
   const [descriptionRules,setDescriptionRules]=useState<DescriptionRule[]>([]);
   const [categoryScreen,setCategoryScreen]=useState<"categories"|"rules">("categories");
@@ -308,6 +317,7 @@ function Home() {
     else { setTransactionSort(column); setTransactionSortDirection(column === "date" ? "desc" : "asc"); }
   }
   const filteredTransactions = transactions.filter((item) =>
+    (reconciliationFilter === "all" || (reconciliationFilter === "locked" ? lockedTransactionIds.includes(item.id) : !lockedTransactionIds.includes(item.id))) &&
     (transactionTypeFilter === "all" || (transactionTypeFilter === "uncategorized" ? (!item.categoryId || !item.subcategoryId || normalizedExcelText(item.group) === "outros" || normalizedExcelText(item.subcategory) === "outros") : item.type === transactionTypeFilter)) &&
     (!transactionMonthFilter || item.date.startsWith(transactionMonthFilter)) &&
     (!transactionColumnFilters.date || displayDate(item.date).toLocaleLowerCase("pt-BR").includes(transactionColumnFilters.date.toLocaleLowerCase("pt-BR")) || item.date.includes(transactionColumnFilters.date)) &&
@@ -330,6 +340,7 @@ function Home() {
   const editCategories = categories.filter((item) => item.type === (editItem?.type === "income" ? "income" : "expense"));
   const editCategory = editCategories.find((item) => item.id === editCategoryId);
   function startEdit(item: Transaction) {
+    if (isTransactionLocked(item.id)) return;
     setEditId(item.id);
     setEditCategoryId(item.categoryId || "");
     setEditSubcategoryId(item.subcategoryId || "");
@@ -337,9 +348,10 @@ function Home() {
     setEditPaidFor(item.paidFor || "");
   }
   function saveEdit() {
+    if (editId === null || isTransactionLocked(editId)) { setEditId(null); return; }
     const category = editCategories.find((item) => item.id === editCategoryId);
     const subcategory = category?.subcategories.find((item) => item.id === editSubcategoryId);
-    setTransactions((current) => current.map((item) => item.id === editId ? { ...item,
+    setTransactions((current) => current.map((item) => item.id === editId && !lockedTransactionIds.includes(item.id) ? { ...item,
       displayDescription: editDescription.trim() && editDescription.trim() !== item.description ? editDescription.trim() : undefined, paidFor: editPaidFor.trim(),
       categoryId: category?.id, subcategoryId: subcategory?.id,
       group: category?.name || item.group, subcategory: subcategory?.name || (category ? "" : item.subcategory)
@@ -371,6 +383,7 @@ function Home() {
         setAccounts(stored.accounts as Account[]);
         setCategories(loadedCategories);
         setTransactions(migrateTransactions(stored.transactions as Transaction[],loadedCategories));
+        setLockedTransactionIds(Array.isArray(stored.lockedTransactionIds) ? (stored.lockedTransactionIds as unknown[]).filter((id): id is number => typeof id === "number") : []);
         setDescriptionRules(Array.isArray(stored.descriptionRules) ? stored.descriptionRules as DescriptionRule[] : []);
         setCardEntries(Array.isArray(stored.cardEntries) ? stored.cardEntries as CardEntry[] : []);
         setPendingTransactions(Array.isArray(stored.pendingTransactions) ? stored.pendingTransactions as Transaction[] : []);
@@ -387,7 +400,7 @@ function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[cloudToken]);
 
-  const cloudPayload = JSON.stringify({accounts,transactions,categories,descriptionRules,cardEntries,pendingTransactions,rejectedTransferPairs});
+  const cloudPayload = JSON.stringify({accounts,transactions,categories,descriptionRules,cardEntries,pendingTransactions,rejectedTransferPairs,lockedTransactionIds});
   const lastPayload = useRef<string | null>(null);
   useEffect(()=>{
     if (!storageLoaded || cloudBlocked.current || !cloudUrl || !cloudKey || cloudRevision.current===null) return;
@@ -926,6 +939,7 @@ if (amountCents <= 0) {
   }
 
   function deleteTransaction(id: number) {
+    if (isTransactionLocked(id)) return;
     if (confirm("Deseja excluir este lançamento?")) {
       setTransactions((current) =>
         current.filter((transaction) => transaction.id !== id)
@@ -1515,7 +1529,8 @@ if (amountCents <= 0) {
                 <p className="mt-1 text-xs text-[#94A0AF]">
                   Exibindo {filteredTransactions.length} de {transactions.length} movimentação(ões)
                 </p>
-                <div className="mt-3 flex justify-end">
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap gap-2">{(["all", "open", "locked"] as const).map(status => <button key={status} type="button" onClick={() => { setReconciliationFilter(status); setSelectedTransactionIds([]); }} aria-pressed={reconciliationFilter === status} className={`rounded-xl border px-3 py-2 text-xs font-semibold ${reconciliationFilter === status ? "border-[#B9CBE1] bg-white text-[#263D59]" : "border-white/80 bg-white/40 text-[#77879B]"}`}>{status === "all" ? "Todos" : status === "open" ? "A tratar" : "Concluídos"}</button>)}</div>
                   <button type="button" aria-expanded={showColumnFilters} onClick={() => setShowColumnFilters((visible) => !visible)}
                     className="rounded-xl border border-white/90 bg-white/70 px-4 py-2 text-xs font-semibold text-[#526B8B] shadow-sm transition hover:bg-white">
                     {showColumnFilters ? "Ocultar filtros avançados" : "Mostrar filtros avançados"}
@@ -1563,6 +1578,12 @@ if (amountCents <= 0) {
                 </div>
               ) : (
                 <div className="space-y-1">
+                  <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-white/80 bg-white/45 px-3 py-2 text-xs text-[#526B8B]">
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={filteredTransactions.length > 0 && filteredTransactions.every(t => selectedTransactionIds.includes(t.id))} onChange={event => setSelectedTransactionIds(event.target.checked ? filteredTransactions.map(t => t.id) : [])} /> Selecionar visíveis</label>
+                    <span>{selectedTransactionIds.length} selecionado(s)</span>
+                    <button type="button" disabled={!selectedTransactionIds.some(id => !lockedTransactionIds.includes(id))} onClick={() => setTransactionLock(selectedTransactionIds.filter(id => !lockedTransactionIds.includes(id)), true)} className="rounded-lg bg-white/90 px-3 py-1.5 font-semibold disabled:opacity-40">Concluir selecionados</button>
+                    <button type="button" disabled={!selectedTransactionIds.some(id => lockedTransactionIds.includes(id))} onClick={() => setTransactionLock(selectedTransactionIds.filter(id => lockedTransactionIds.includes(id)), false)} className="rounded-lg bg-white/90 px-3 py-1.5 font-semibold disabled:opacity-40">Reabrir selecionados</button>
+                  </div>
                   <div className="grid grid-cols-2 gap-3 border-b border-[#E2E8F0] pb-3 md:grid-cols-[100px_minmax(180px,2fr)_minmax(140px,1.4fr)_120px_60px]">
                     {(["date", "description", "category", "amount"] as const).map((column) => (
                       <div key={column} className="min-w-0 space-y-2">
@@ -1578,19 +1599,21 @@ if (amountCents <= 0) {
                   {filteredTransactions.map((transaction) => (
                     <div key={transaction.id} className={`border-b border-[#EDF0F4] py-3 last:border-0 ${editId === transaction.id ? "rounded-2xl border border-[#A7BBD6] bg-white/80 px-4 shadow-sm" : ""}`}>
                       <div className="flex flex-wrap items-start justify-between gap-3">
-                        <button type="button" aria-expanded={editId === transaction.id} onClick={() => editId === transaction.id ? setEditId(null) : startEdit(transaction)} className="min-w-0 flex-1 text-left">
+                        <input type="checkbox" aria-label={`Selecionar lançamento ${transaction.id}`} checked={selectedTransactionIds.includes(transaction.id)} onChange={event => setSelectedTransactionIds(current => event.target.checked ? [...current, transaction.id] : current.filter(id => id !== transaction.id))} className="mt-1" />
+                        <button type="button" disabled={isTransactionLocked(transaction.id)} aria-expanded={editId === transaction.id} onClick={() => editId === transaction.id ? setEditId(null) : startEdit(transaction)} className="min-w-0 flex-1 text-left">
                           <p className="break-words text-sm font-medium text-[#35445A]">{transaction.displayDescription || transaction.description}</p>
                           <p className="mt-1 text-xs text-[#77879B]">{displayDate(transaction.date)} · {getTransactionAccountName(transaction)}</p>
                           <p className="mt-2 text-xs text-[#64748B]">{transaction.type === "income" ? "Receita" : transaction.type === "expense" ? "Despesa" : "Transferência"} · {getCategoryNames(transaction).group}{getCategoryNames(transaction).subcategory ? " → " + getCategoryNames(transaction).subcategory : ""}</p>
                         </button>
-                        <div className="flex shrink-0 items-start gap-3">
-                          <button type="button" aria-expanded={editId === transaction.id} aria-label={"Editar " + (transaction.displayDescription || transaction.description)} onClick={() => editId === transaction.id ? setEditId(null) : startEdit(transaction)} className={`text-sm font-semibold ${transaction.type === "income" ? "text-emerald-700" : transaction.type === "expense" ? "text-[#B65D58]" : "text-[#526B8B]"}`}>
+                        <div className="flex shrink-0 flex-wrap items-start gap-3">
+                          <button type="button" onClick={() => setTransactionLock([transaction.id], !isTransactionLocked(transaction.id))} className={`rounded-lg border px-2 py-1 text-xs font-semibold ${isTransactionLocked(transaction.id) ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-[#DCE5EF] bg-white/70 text-[#526B8B]"}`}>{isTransactionLocked(transaction.id) ? "🔒 Concluído · Reabrir" : "✓ Concluir"}</button>
+                          <button type="button" disabled={isTransactionLocked(transaction.id)} aria-expanded={editId === transaction.id} aria-label={"Editar " + (transaction.displayDescription || transaction.description)} onClick={() => editId === transaction.id ? setEditId(null) : startEdit(transaction)} className={`text-sm font-semibold ${transaction.type === "income" ? "text-emerald-700" : transaction.type === "expense" ? "text-[#B65D58]" : "text-[#526B8B]"}`}>
                             {transaction.type === "income" ? "+" : transaction.type === "expense" ? "−" : ""}{money(transaction.amountCents)} <span className="ml-1 text-[#7A8BA4]">{editId === transaction.id ? "⌃" : "⌄"}</span>
                           </button>
-                          <button type="button" onClick={() => deleteTransaction(transaction.id)} className="text-xs text-[#A0AABA] hover:text-rose-600" title="Excluir lançamento">Excluir</button>
+                          <button type="button" disabled={isTransactionLocked(transaction.id)} onClick={() => deleteTransaction(transaction.id)} className="text-xs text-[#A0AABA] hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-30" title={isTransactionLocked(transaction.id) ? "Reabra o lançamento antes de excluir" : "Excluir lançamento"}>Excluir</button>
                         </div>
                       </div>
-                      {editId === transaction.id && editItem && <div className="mt-4 space-y-3 border-t border-[#E5EAF0] pt-4">
+                      {editId === transaction.id && editItem && !isTransactionLocked(transaction.id) && <div className="mt-4 space-y-3 border-t border-[#E5EAF0] pt-4">
                         <label className="block space-y-1"><span className="text-xs text-[#64748B]">Descrição exibida</span><input value={editDescription} onChange={(event) => setEditDescription(event.target.value)} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm" /></label>
                         {editItem.type !== "transfer" && <div className="grid gap-3 sm:grid-cols-2">
                           <label className="block space-y-1"><span className="text-xs text-[#64748B]">Categoria</span><select value={editCategoryId} onChange={(event) => {setEditCategoryId(event.target.value);setEditSubcategoryId("");}} className="w-full rounded-xl border border-[#E2E8F0] bg-white p-2.5 text-sm"><option value="">Não classificada</option>{editCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
