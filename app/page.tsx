@@ -323,7 +323,7 @@ function Home() {
     (!transactionColumnFilters.date || displayDate(item.date).toLocaleLowerCase("pt-BR").includes(transactionColumnFilters.date.toLocaleLowerCase("pt-BR")) || item.date.includes(transactionColumnFilters.date)) &&
     (!transactionColumnFilters.description || normalizedExcelText(item.displayDescription || item.description).includes(normalizedExcelText(transactionColumnFilters.description))) &&
     (!transactionColumnFilters.category || normalizedExcelText([categories.find(c => c.id === item.categoryId)?.name || item.group, categories.find(c => c.id === item.categoryId)?.subcategories.find(sub => sub.id === item.subcategoryId)?.name || item.subcategory].join(" ")).includes(normalizedExcelText(transactionColumnFilters.category))) &&
-    (!transactionColumnFilters.amount.trim() || (() => { const raw = transactionColumnFilters.amount.trim().replace(/\\s|R\\$/gi, ""); const normalized = raw.includes(",") ? raw.replace(/\\./g, "").replace(",", ".") : raw; if (!/^\\d+(?:\\.\\d{1,2})?$/.test(normalized)) return false; return item.amountCents === Math.round(Number(normalized) * 100); })())
+    (!transactionColumnFilters.amount.trim() || (() => { const raw = transactionColumnFilters.amount.trim().replace(/\s|R\$/gi, ""); const normalized = raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw; if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) return false; return item.amountCents === Math.round(Number(normalized) * 100); })())
   ).sort((a, b) => {
     const direction = transactionSortDirection === "asc" ? 1 : -1;
     if (transactionSort === "amount") return (a.amountCents - b.amountCents || a.id - b.id) * direction;
