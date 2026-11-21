@@ -357,7 +357,7 @@ function Home() {
   const [driveCardFile,setDriveCardFile]=useState<File|null>(null);
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
   const [transactionTab, setTransactionTab] = useState<"all" | "pending" | "transfers">("all");
-  const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "income" | "expense" | "uncategorized">("all");
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState<"all" | "income" | "expense" | "transfer" | "uncategorized">("all");
   const [transactionMonthFilter, setTransactionMonthFilter] = useState("");
   const [rejectedTransferPairs, setRejectedTransferPairs] = useState<string[]>([]);
   const transferPairKey = (a: number, b: number) => [a, b].sort((x, y) => x - y).join(":");
@@ -398,7 +398,7 @@ function Home() {
   }
   const filteredTransactions = transactions.filter((item) =>
     (reconciliationFilter === "all" || (reconciliationFilter === "locked" ? lockedTransactionIds.includes(item.id) : !lockedTransactionIds.includes(item.id))) &&
-    (transactionTypeFilter === "all" || (transactionTypeFilter === "uncategorized" ? (!item.categoryId || !item.subcategoryId || normalizedExcelText(item.group) === "outros" || normalizedExcelText(item.subcategory) === "outros") : item.type === transactionTypeFilter)) &&
+    (transactionTypeFilter === "all" || (transactionTypeFilter === "uncategorized" ? (!item.categoryId || !item.subcategoryId || normalizedExcelText(item.group) === "outros" || normalizedExcelText(item.subcategory) === "outros") : transactionTypeFilter === "transfer" ? (item.type === "transfer" || Boolean(item.internalTransferPairId)) : item.type === transactionTypeFilter)) &&
     (!transactionMonthFilter || item.date.startsWith(transactionMonthFilter)) &&
     (!transactionColumnFilters.date || displayDate(item.date).toLocaleLowerCase("pt-BR").includes(transactionColumnFilters.date.toLocaleLowerCase("pt-BR")) || item.date.includes(transactionColumnFilters.date)) &&
     (!transactionColumnFilters.description || normalizedExcelText(item.displayDescription || item.description).includes(normalizedExcelText(transactionColumnFilters.description))) &&
@@ -1677,6 +1677,7 @@ if (amountCents <= 0) {
                       ["all", "Todos"],
                       ["income", "Receitas"],
                       ["expense", "Despesas"],
+                      ["transfer", "Transferências"],
                       ["uncategorized", "Sem categoria"],
                     ] as const).map(([filter, label]) => (
                       <button key={filter} type="button" onClick={() => setTransactionTypeFilter(filter)}
