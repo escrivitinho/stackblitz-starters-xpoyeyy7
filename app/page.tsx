@@ -36,6 +36,7 @@ function GlassSubcategoryPicker({ categories, categoryId, subcategoryId, onPick 
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(0);
   const root = useRef<HTMLDivElement>(null);
+  const pickerId = useId();
   const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
   const options = categories.flatMap(category => category.subcategories.map(subcategory => ({ category, subcategory })));
   const selected = options.find(item => item.category.id === categoryId && item.subcategory.id === subcategoryId);
