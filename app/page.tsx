@@ -276,7 +276,20 @@ function Home() {
     if (!outgoing || !incoming || outgoing.type !== "expense" || incoming.type !== "income") { window.alert("A transferência precisa ter uma despesa (saída) e uma receita (entrada)."); return; }
     if (outgoing.accountId === incoming.accountId) { window.alert("Selecione movimentações de duas contas diferentes."); return; }
     if (outgoing.amountCents !== incoming.amountCents) { window.alert("Os valores precisam ser iguais para vincular a transferência."); return; }
-    if (pair.some(item => item && (isTransactionLocked(item.id) || item.internalTransferPairId))) { window.alert("Reabra os lançamentos conciliados e escolha movimentações ainda não vinculadas."); return; }
+    if (pair.some(item => item && isTransactionLocked(item.id))) { window.alert("Um dos lançamentos está conciliado. Reabra-o antes de vincular uma transferência."); return; }
+    const existingOutgoingPair = outgoing.internalTransferPairId;
+    const existingIncomingPair = incoming.internalTransferPairId;
+    if (existingOutgoingPair || existingIncomingPair) {
+      const expectedPairId = "internal:" + transferPairKey(outgoing.id, incoming.id);
+      if (existingOutgoingPair === expectedPairId && existingIncomingPair === expectedPairId) {
+        if (!window.confirm("Esses dois lançamentos já estão vinculados como transferência. Deseja apenas conciliá-los?")) return;
+        setLockedTransactionIds(current => Array.from(new Set([...current, outgoing.id, incoming.id])));
+        setSelectedTransactionIds([]);
+        return;
+      }
+      window.alert("Um dos lançamentos já está vinculado a outra transferência. É necessário revisar esse vínculo antes de criar outro; nenhuma movimentação foi alterada.");
+      return;
+    }
     const from = accounts.find(account => account.id === outgoing.accountId)?.name || "Origem";
     const to = accounts.find(account => account.id === incoming.accountId)?.name || "Destino";
     if (!window.confirm(`Confirmar transferência de ${money(outgoing.amountCents)} de ${from} para ${to}? Os dois registros serão vinculados e conciliados, sem duplicar movimentações bancárias.`)) return;
