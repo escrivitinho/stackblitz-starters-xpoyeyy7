@@ -283,6 +283,7 @@ function Home() {
       const expectedPairId = "internal:" + transferPairKey(outgoing.id, incoming.id);
       if (existingOutgoingPair === expectedPairId && existingIncomingPair === expectedPairId) {
         if (!window.confirm("Esses dois lançamentos já estão vinculados como transferência. Deseja apenas conciliá-los?")) return;
+        setTransactions(current => current.map(item => item.id === outgoing.id || item.id === incoming.id ? { ...item, categoryId: undefined, subcategoryId: undefined, group: "Transferências", subcategory: "Transferência entre contas", isReimbursement: false } : item));
         setLockedTransactionIds(current => Array.from(new Set([...current, outgoing.id, incoming.id])));
         setSelectedTransactionIds([]);
         return;
@@ -364,7 +365,7 @@ function Home() {
   function confirmTransferPair(outgoingId: number, incomingId: number) {
     const pairId = "internal:" + transferPairKey(outgoingId, incomingId);
     setTransactions((current) => current.map((item) =>
-      item.id === outgoingId || item.id === incomingId ? { ...item, internalTransferPairId: pairId } : item
+      item.id === outgoingId || item.id === incomingId ? { ...item, internalTransferPairId: pairId, categoryId: undefined, subcategoryId: undefined, group: "Transferências", subcategory: "Transferência entre contas", isReimbursement: false } : item
     ));
   }
   function rejectTransferPair(outgoingId: number, incomingId: number) {
