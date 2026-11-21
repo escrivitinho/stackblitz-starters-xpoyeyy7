@@ -1886,7 +1886,7 @@ if (amountCents <= 0) {
               </button>
             </div>
 
-            {showAccountForm && (
+            {showAccountForm && editingId === null && (
               <div className="rounded-3xl border border-white/90 bg-white/75 p-6 shadow-sm backdrop-blur-2xl">
                 <div className="mb-6 flex items-center justify-between">
                   <div>
@@ -1971,7 +1971,7 @@ if (amountCents <= 0) {
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {accounts.map((account) => (
-                <div key={account.id} className="group relative overflow-hidden rounded-3xl border border-white/90 bg-white/65 p-5 shadow-[0_8px_32px_rgba(80,110,150,0.07)] backdrop-blur-2xl transition hover:shadow-[0_12px_38px_rgba(80,110,150,0.13)]">
+                <div key={account.id} className="group relative rounded-3xl border border-white/90 bg-white/65 p-5 shadow-[0_8px_32px_rgba(80,110,150,0.07)] backdrop-blur-2xl transition hover:shadow-[0_12px_38px_rgba(80,110,150,0.13)]">
                   <div className="pointer-events-none absolute -right-12 -top-16 h-40 w-40 rounded-full bg-sky-100/70 blur-[60px]" />
                   <div className="relative flex items-start justify-between gap-3">
                     <button onClick={() => setSelectedAccountId(account.id)} className="flex items-center gap-3 text-left">
@@ -1985,6 +1985,90 @@ if (amountCents <= 0) {
                       Editar
                     </button>
                   </div>
+            {showAccountForm && editingId === account.id && (
+              <div className="rounded-3xl border border-white/90 bg-white/75 p-6 shadow-sm backdrop-blur-2xl">
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-[#26364D]">
+                      {editingId !== null ? "Editar conta" : "Nova conta"}
+                    </h3>
+                    <p className="mt-1 text-xs text-[#94A0AF]">Informe os dados da sua conta bancária.</p>
+                  </div>
+                  <button onClick={closeAccountForm} className="text-xl text-[#8A96A7]">×</button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                  <label className="space-y-2">
+                    <span className="text-xs font-medium text-[#64748B]">Instituição financeira</span>
+                    <input
+                      value={accountName}
+                      onChange={(e) => setAccountName(e.target.value)}
+                      placeholder="Ex.: Nubank, Inter, Caixa..."
+                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF]"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-xs font-medium text-[#64748B]">Tipo de conta</span>
+                    <select
+                      value={accountType}
+                      onChange={(e) => setAccountType(e.target.value)}
+                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none"
+                    >
+                      <option>Conta corrente</option>
+                      <option>Conta poupança</option>
+                      <option>Conta de pagamento</option>
+                      <option>Conta salário</option>
+                      <option>Outra</option>
+                    </select>
+                  </label>
+                </div>
+
+                {balanceMethod === "manual" && (
+                  <label className="mt-5 block space-y-2">
+                    <span className="text-xs font-medium text-[#64748B]">Saldo inicial (R$)</span>
+                    <input
+                      value={initialBalance}
+                      onChange={(e) => {
+                        setInitialBalance(e.target.value);
+                        setAccountError("");
+                      }}
+                      placeholder="Ex.: 1.500,00"
+                      inputMode="decimal"
+                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF] md:max-w-sm"
+                    />
+                  </label>
+                )}
+
+                {balanceMethod === "manual" && (
+                  <label className="mt-5 block space-y-2">
+                    <span className="text-xs font-medium text-[#64748B]">Data do saldo inicial</span>
+                    <input
+                      type="date"
+                      value={openingBalanceDate}
+                      onChange={(e) => { setOpeningBalanceDate(e.target.value); setAccountError(""); }}
+                      className="w-full rounded-xl border border-[#E2E8F0] bg-white/80 px-4 py-3 text-sm outline-none focus:border-[#A7A9AF] md:max-w-sm"
+                    />
+                  </label>
+                )}
+
+                {accountError && (
+                  <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {accountError}
+                  </div>
+                )}
+
+                <div className="mt-6 flex flex-wrap justify-end gap-3">
+                  <button onClick={closeAccountForm} className="rounded-xl border border-[#E2E8F0] bg-white/70 px-5 py-3 text-sm text-[#64748B]">
+                    Cancelar
+                  </button>
+                  <button onClick={saveAccount} className="rounded-xl bg-[#34383F] px-6 py-3 text-sm font-medium text-white hover:bg-[#25282D]">
+                    Salvar conta
+                  </button>
+                </div>
+              </div>
+            )}
+
+
                   <div className="relative mt-7 border-t border-[#E9EEF4] pt-5">
                     <p className="text-xs text-[#8A98AA]">Saldo da conta</p>
                     <p className={`mt-2 text-2xl font-semibold tracking-tight ${calculateAccountBalance(account, transactions) !== null && calculateAccountBalance(account, transactions)! < 0 ? "text-rose-700" : "text-[#263D59]"}`}>
