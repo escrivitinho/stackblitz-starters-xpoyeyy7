@@ -160,6 +160,7 @@ export default function CardsManager({ entries, onChange, categories, descriptio
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [cardFilter, setCardFilter] = useState("Todos");
   const [monthFilter, setMonthFilter] = useState("Todos");
+  const [treatmentFilter, setTreatmentFilter] = useState<"all" | "treated" | "untreated">("all");
   const expenseCategories = categories.filter((category) => category.type === "expense");
   const months = Array.from(new Set(entries.map((entry) => entry.date.slice(0, 7)))).sort().reverse();
   type CardSortColumn = "status" | "date" | "description" | "category" | "card" | "amount";
@@ -181,7 +182,13 @@ export default function CardsManager({ entries, onChange, categories, descriptio
       case "amount": return entry.amountCents;
     }
   };
-  const filtered = entries.filter((entry) => (cardFilter === "Todos" || entry.card === cardFilter) && (monthFilter === "Todos" || entry.date.startsWith(monthFilter))).sort((a, b) => {
+  const filtered = entries.filter((entry) => {
+    if (cardFilter !== "Todos" && entry.card !== cardFilter) return false;
+    if (monthFilter !== "Todos" && !entry.date.startsWith(monthFilter)) return false;
+    const kind = entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase");
+    const treated = kind === "payment" || (kind === "purchase" && expenseCategories.some(category => category.id === entry.categoryId));
+    return treatmentFilter === "all" || (treatmentFilter === "treated" ? treated : !treated);
+  }).sort((a, b) => {
     const av = cardSortValue(a, cardSort), bv = cardSortValue(b, cardSort);
     const comparison = typeof av === "number" && typeof bv === "number" ? av - bv : String(av).localeCompare(String(bv), "pt-BR", { sensitivity: "base", numeric: true });
     return (cardSortDirection === "asc" ? comparison : -comparison) || b.date.localeCompare(a.date) || a.id.localeCompare(b.id);
@@ -364,6 +371,11 @@ export default function CardsManager({ entries, onChange, categories, descriptio
         <div className="mt-5 flex flex-wrap gap-3">
           <label className="text-xs text-[#64748B]">Cartão<select aria-label="Filtrar cartão" className="mt-1 block rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-sm" value={cardFilter} onChange={(e) => setCardFilter(e.target.value)}><option>Todos</option><option>Nubank Crédito</option><option>Inter Crédito</option></select></label>
           <label className="text-xs text-[#64748B]">Mês<select aria-label="Filtrar mês" className="mt-1 block rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-sm" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}><option>Todos</option>{months.map((month) => <option key={month} value={month}>{month.slice(5)}/{month.slice(0, 4)}</option>)}</select></label>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Filtrar lançamentos por tratamento">
+          {([["all", "Todos"], ["treated", "Tratados"], ["untreated", "Não tratados"]] as const).map(([value, label]) => (
+            <button key={value} type="button" aria-pressed={treatmentFilter === value} onClick={() => setTreatmentFilter(value)} className={`rounded-xl border px-4 py-2 text-sm font-semibold transition-colors ${treatmentFilter === value ? "border-[#A7BBD6] bg-white/90 text-[#344D70] shadow-sm" : "border-white/80 bg-white/45 text-[#718198] hover:bg-white/70"}`}>{label}</button>
+          ))}
         </div>
         <div className="mt-5 space-y-2">
           <div className="sticky top-0 z-30 hidden grid-cols-[120px_100px_minmax(240px,2fr)_minmax(170px,1.2fr)_130px_130px] gap-3 rounded-xl border border-white/80 bg-[#F1F3F8]/95 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#8190A4] shadow-sm backdrop-blur-2xl lg:grid">
