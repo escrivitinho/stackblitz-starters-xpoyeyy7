@@ -17,6 +17,8 @@ export type CardEntry = {
   categoryId?: string;
   subcategoryId?: string;
   kind?: "purchase" | "credit" | "payment";
+  creditNature?: "refund" | "cashback" | "adjustment";
+  refundedPurchaseId?: string;
 };
 
 type Draft = Omit<CardEntry, "id">;
@@ -162,6 +164,11 @@ export default function CardsManager({ entries, onChange, categories, descriptio
   const [monthFilter, setMonthFilter] = useState("Todos");
   const [treatmentFilter, setTreatmentFilter] = useState<"all" | "treated" | "untreated">("all");
   const expenseCategories = categories.filter((category) => category.type === "expense");
+  const creditIsTreated = (entry: CardEntry) => entry.creditNature === "cashback" || entry.creditNature === "adjustment" || (entry.creditNature === "refund" && Boolean(entry.refundedPurchaseId || expenseCategories.some(category => category.id === entry.categoryId)));
+  const entryIsTreated = (entry: CardEntry) => {
+    const kind = entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase");
+    return kind === "payment" || (kind === "credit" ? creditIsTreated(entry) : expenseCategories.some(category => category.id === entry.categoryId));
+  };
   const months = Array.from(new Set(entries.map((entry) => entry.date.slice(0, 7)))).sort().reverse();
   type CardSortColumn = "status" | "date" | "description" | "category" | "card" | "amount";
   const [cardSort, setCardSort] = useState<CardSortColumn>("date");
@@ -174,7 +181,7 @@ export default function CardsManager({ entries, onChange, categories, descriptio
     const kind = entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase");
     const category = expenseCategories.find(item => item.id === entry.categoryId);
     switch (column) {
-      case "status": return kind === "payment" ? "Pagamento" : kind === "purchase" && category ? "Classificado" : "A tratar";
+      case "status": return kind === "payment" ? "Pagamento" : entryIsTreated(entry) ? "Classificado" : "A tratar";
       case "date": return entry.date;
       case "description": return entry.description;
       case "category": return category?.name ?? "";
@@ -186,7 +193,7 @@ export default function CardsManager({ entries, onChange, categories, descriptio
     if (cardFilter !== "Todos" && entry.card !== cardFilter) return false;
     if (monthFilter !== "Todos" && !entry.date.startsWith(monthFilter)) return false;
     const kind = entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase");
-    const treated = kind === "payment" || (kind === "purchase" && expenseCategories.some(category => category.id === entry.categoryId));
+    const treated = entryIsTreated(entry);
     return treatmentFilter === "all" || (treatmentFilter === "treated" ? treated : !treated);
   }).sort((a, b) => {
     const av = cardSortValue(a, cardSort), bv = cardSortValue(b, cardSort);
@@ -394,7 +401,7 @@ export default function CardsManager({ entries, onChange, categories, descriptio
             const suggestedSubcategory = suggestedCategory?.subcategories.find(item => item.id === suggestion?.subcategoryId);
             const editing = editingEntryId === entry.id;
             const credit = kind === "credit" || entry.amountCents < 0;
-            const classified = kind === "purchase" && Boolean(category);
+            const classified = entryIsTreated(entry);
             const glassBackground = credit ? "linear-gradient(120deg, rgba(101,221,172,0.59), rgba(211,251,233,0.48))" : "linear-gradient(120deg, rgba(251,155,171,0.62), rgba(255,224,230,0.49))";
             const glassBorder = credit ? "rgba(16,185,129,0.55)" : "rgba(225,72,102,0.56)";
             return <div key={entry.id} onClick={(event) => { if ((event.target as HTMLElement).closest("button, input, select, textarea, label, a, [role=combobox], [role=listbox]")) return; setEditingEntryId(current => current === entry.id ? null : entry.id); }} style={{background: kind === "payment" ? "rgba(255,255,255,0.40)" : classified ? (credit ? "linear-gradient(120deg, rgba(167,243,208,0.20), rgba(236,253,245,0.18))" : "linear-gradient(120deg, rgba(254,205,211,0.22), rgba(255,240,242,0.19))") : glassBackground, borderColor: kind === "payment" ? "rgba(203,213,225,0.55)" : classified ? (credit ? "rgba(52,211,153,0.22)" : "rgba(244,114,136,0.22)") : glassBorder}} className={`relative cursor-pointer overflow-visible rounded-2xl border px-4 py-3 transition-shadow hover:shadow-md shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_5px_18px_rgba(70,90,120,0.035)] backdrop-blur-xl ${editing ? "z-40 ring-1 ring-[#A7BBD6]" : "z-0"}`}>
@@ -402,7 +409,7 @@ export default function CardsManager({ entries, onChange, categories, descriptio
                 <span className="inline-flex h-8 w-[116px] items-center justify-center rounded-lg border border-white/75 bg-white/55 px-2 text-xs font-semibold text-[#526B8B]">{kind === "payment" ? "Pagamento" : classified ? "Classificado" : "A tratar"}</span>
                 <span className="text-xs text-[#64748B] lg:pt-1">{entry.date.split("-").reverse().join("/")}</span>
                 <button type="button" aria-expanded={editing} aria-label={(editing ? "Fechar edição de " : "Editar ") + entry.description} onClick={() => setEditingEntryId(editing ? null : entry.id)} className="min-w-0 whitespace-normal break-words text-left text-sm font-medium leading-relaxed text-[#35445A]">{entry.description}</button>
-                <span className="min-w-0 whitespace-normal break-words text-xs leading-relaxed text-[#64748B] lg:pt-1">{kind === "purchase" ? (category?.name ?? "Não classificada") + (subcategory ? " → " + subcategory.name : "") : kind === "credit" ? "Crédito / estorno" : "Pagamento da fatura"}</span>
+                <span className="min-w-0 whitespace-normal break-words text-xs leading-relaxed text-[#64748B] lg:pt-1">{kind === "purchase" ? (category?.name ?? "Não classificada") + (subcategory ? " → " + subcategory.name : "") : kind === "credit" ? (entry.creditNature === "refund" ? "Estorno" + (category ? " · " + category.name + (subcategory ? " → " + subcategory.name : "") : "") : entry.creditNature === "cashback" ? "Cashback / recompensa" : entry.creditNature === "adjustment" ? "Ajuste de fatura" : "Crédito / estorno") : "Pagamento da fatura"}</span>
                 <span className="text-xs text-[#64748B] lg:pt-1">{entry.card}</span>
                 <button type="button" onClick={() => setEditingEntryId(editing ? null : entry.id)} className={`whitespace-nowrap text-left text-sm font-semibold lg:text-right ${credit ? "text-emerald-700" : "text-[#B65D58]"}`}>{credit ? "−" : ""}{formatCents(Math.abs(entry.amountCents))} <span className="text-[#7A8BA4]">{editing ? "⌃" : "⌄"}</span></button>
               </div>
@@ -411,9 +418,18 @@ export default function CardsManager({ entries, onChange, categories, descriptio
                   <p className="text-xs text-[#395D7A]">Sugestão: <strong>{suggestedCategory.name}{suggestedSubcategory ? " → " + suggestedSubcategory.name : ""}</strong></p>
                   <button type="button" onClick={() => updateEntry(entry.id, { categoryId: suggestion.categoryId, subcategoryId: suggestion.subcategoryId })} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-[#294263] shadow-sm ring-1 ring-sky-200">Aplicar sugestão</button>
                 </div>}
+                {kind === "credit" && <div className="space-y-3 rounded-xl border border-white/80 bg-white/45 p-3">
+                  <GlassSelect label="Natureza do crédito" value={entry.creditNature ?? ""} options={[{value:"",label:"Selecionar natureza"},{value:"refund",label:"Estorno de compra"},{value:"cashback",label:"Cashback / recompensa"},{value:"adjustment",label:"Ajuste de fatura"}]} onChange={value=>updateEntry(entry.id,{creditNature:value as CardEntry["creditNature"] || undefined,refundedPurchaseId:undefined,categoryId:undefined,subcategoryId:undefined})}/>
+                  {entry.creditNature === "refund" && <>
+                    <GlassSelect label="Vincular compra original (opcional)" value={entry.refundedPurchaseId ?? ""} options={[{value:"",label:"Selecionar compra ou classificar manualmente"},...entries.filter(candidate=>candidate.id!==entry.id && candidate.card===entry.card && (candidate.kind??(candidate.amountCents<0?"credit":"purchase"))==="purchase").map(candidate=>({value:candidate.id,label:candidate.date.split("-").reverse().join("/")+" · "+candidate.description+" · "+formatCents(candidate.amountCents)}))]} onChange={value=>{const purchase=entries.find(candidate=>candidate.id===value);updateEntry(entry.id,{refundedPurchaseId:value||undefined,categoryId:purchase?.categoryId,subcategoryId:purchase?.subcategoryId})}}/>
+                    <p className="text-xs text-[#64748B]">Vincule a compra original para herdar sua classificação ou escolha a categoria e subcategoria abaixo. O crédito continua reduzindo a fatura.</p>
+                  </>}
+                  {entry.creditNature === "cashback" && <p className="text-xs text-[#64748B]">Benefício registrado separadamente, sem gerar entrada na conta bancária.</p>}
+                  {entry.creditNature === "adjustment" && <p className="text-xs text-[#64748B]">Ajuste da operadora, sem criar receita ou despesa fictícia.</p>}
+                </div>}
                 <div className="grid gap-2 sm:grid-cols-3">
-                  <GlassSelect label="Tipo" value={kind} options={[{value:"purchase",label:"Compra"},{value:"credit",label:"Crédito / estorno"},{value:"payment",label:"Pagamento da fatura"}]} onChange={value=>updateEntry(entry.id,{kind:value as CardEntry["kind"],categoryId:undefined,subcategoryId:undefined})}/>
-                  <GlassSelect label="Categoria" disabled={kind!=="purchase"} value={entry.categoryId??""} options={[{value:"",label:"Não classificada"},...expenseCategories.map(item=>({value:item.id,label:item.name}))]} onChange={value=>updateEntry(entry.id,{categoryId:value||undefined,subcategoryId:undefined})}/>
+                  <GlassSelect label="Tipo" value={kind} options={[{value:"purchase",label:"Compra"},{value:"credit",label:"Crédito / estorno"},{value:"payment",label:"Pagamento da fatura"}]} onChange={value=>updateEntry(entry.id,{kind:value as CardEntry["kind"],categoryId:undefined,subcategoryId:undefined,creditNature:undefined,refundedPurchaseId:undefined})}/>
+                  <GlassSelect label="Categoria" disabled={kind!=="purchase" && !(kind==="credit" && entry.creditNature==="refund")} value={entry.categoryId??""} options={[{value:"",label:"Não classificada"},...expenseCategories.map(item=>({value:item.id,label:item.name}))]} onChange={value=>updateEntry(entry.id,{categoryId:value||undefined,subcategoryId:undefined})}/>
                   <GlassSelect label="Subcategoria" disabled={kind!=="purchase"} value={entry.subcategoryId??""} options={[{value:"",label:"Não selecionada"},...(category ? category.subcategories.map(item=>({value:item.id,label:item.name})) : expenseCategories.flatMap(cat=>cat.subcategories.map(item=>({value:cat.id+"::"+item.id,label:item.name,detail:cat.name}))))]} onChange={value=>{if(value.includes("::")){const [catId,subId]=value.split("::");updateEntry(entry.id,{categoryId:catId,subcategoryId:subId})}else updateEntry(entry.id,{subcategoryId:value||undefined})}}/>
                 </div>
                 <div className="flex justify-end"><button type="button" onClick={() => setEditingEntryId(null)} className="rounded-lg border border-white/80 bg-white/65 px-4 py-2 text-xs font-semibold text-[#526B8B]">Concluir edição</button></div>
