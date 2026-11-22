@@ -2192,7 +2192,7 @@ if (amountCents <= 0) {
         {active === "Investimentos" && <InvestmentsManager accounts={accounts.map(({ id, name }) => ({ id, name }))} />}
 
         {active === "Lançamentos · Cartões" && (
-          <CardsManager entries={cardEntries} onChange={setCardEntries} categories={categories} />
+          <CardsManager entries={cardEntries} onChange={setCardEntries} categories={categories} onCategoriesChange={setCategories} />
         )}
         {active === "Cartões" && <CardInvoiceHistory entries={cardEntries} />}
 
@@ -2203,7 +2203,7 @@ if (amountCents <= 0) {
           </div>
         </div>}
         {active === "Central de Importações" && <DriveSettings transactions={transactions} accounts={accounts} categories={categories} onImport={(items) => setTransactions((current) => [...current, ...items.map(item => classifyExcelTransaction(item, categories))])} onCardCsv={setDriveCardFile} cardEntries={cardEntries} onCardImport={(items)=>setCardEntries(current=>[...current,...items.filter(item=>!current.some(entry=>entry.importKey===item.importKey)).map(item=>classifyCardByDescription(item,descriptionRules,categories))])} onPending={(items) => setPendingTransactions((current) => { const known = new Set(current.map((t) => t.importHash)); return [...current, ...items.filter((item) => !known.has(item.importHash))]; })} />}
-        {active === "Central de Importações" && <CardsManager entries={cardEntries} onChange={setCardEntries} categories={categories} descriptionRules={descriptionRules} importOnly driveFile={driveCardFile} />}
+        {active === "Central de Importações" && <CardsManager entries={cardEntries} onChange={setCardEntries} categories={categories} onCategoriesChange={setCategories} descriptionRules={descriptionRules} importOnly driveFile={driveCardFile} />}
         {active === "Categorias" && (
           <div className="space-y-5">
             <div className="flex flex-wrap gap-2">
