@@ -413,11 +413,12 @@ export default function CardsManager({ entries, onChange, categories, onCategori
             <button key={value} type="button" aria-pressed={treatmentFilter === value} onClick={() => setTreatmentFilter(value)} className={`rounded-xl border px-4 py-2 text-sm font-semibold transition-colors ${treatmentFilter === value ? "border-[#A7BBD6] bg-white/90 text-[#344D70] shadow-sm" : "border-white/80 bg-white/45 text-[#718198] hover:bg-white/70"}`}>{label}</button>
           ))}
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="sticky top-0 z-50 mt-4 rounded-2xl border border-white/85 bg-[#F4F7FC]/95 p-3 shadow-[0_8px_28px_rgba(55,75,110,0.12)] backdrop-blur-2xl">
+        <div className="flex flex-wrap items-center gap-2">
           <label className="inline-flex items-center gap-2 text-sm font-medium text-[#526B8B]"><input type="checkbox" checked={visibleEligibleIds.length > 0 && visibleEligibleIds.every(id=>selectedEntryIds.includes(id))} onChange={event=>setSelectedEntryIds(current=>event.target.checked?Array.from(new Set([...current,...visibleEligibleIds])):current.filter(id=>!visibleEligibleIds.includes(id)))} /> Selecionar elegíveis visíveis</label>
           {selectedEntryIds.length > 0 && <><span className="text-sm text-[#64748B]">{selectedEligible.length} selecionado(s)</span><button type="button" onClick={()=>{setBulkOpen(value=>!value);setBulkNotice("");}} className="rounded-xl border border-[#A7BBD6] bg-white/85 px-3 py-2 text-sm font-semibold text-[#344D70]">Categorizar em lote</button><button type="button" onClick={()=>{setSelectedEntryIds([]);setBulkOpen(false);}} className="rounded-xl px-3 py-2 text-sm text-[#64748B]">Limpar seleção</button></>}
         </div>
-        {bulkOpen && selectedEligible.length > 0 && <div className="relative z-40 mt-3 space-y-3 rounded-2xl border border-white/90 bg-white/80 p-4 shadow-sm">
+        {bulkOpen && selectedEligible.length > 0 && <div className="relative mt-3 max-h-[65vh] space-y-3 overflow-y-auto rounded-2xl border border-white/90 bg-white/80 p-4 shadow-sm">
           <p className="text-sm font-semibold text-[#344D70]">Categorizar {selectedEligible.length} lançamento(s) em lote</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <GlassSelect label="Categoria" value={bulkCategoryId} options={[{value:"",label:"Selecionar categoria"},...expenseCategories.map(category=>({value:category.id,label:category.name}))]} onChange={value=>{setBulkCategoryId(value);setBulkSubcategoryId("");}} />
@@ -427,6 +428,7 @@ export default function CardsManager({ entries, onChange, categories, onCategori
           <div className="flex justify-end gap-2"><button type="button" onClick={()=>setBulkOpen(false)} className="rounded-xl bg-white/70 px-4 py-2 text-sm">Cancelar</button><button type="button" disabled={!bulkSubcategoryId} onClick={applyBulkCategory} className="rounded-xl bg-[#344D70] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Aplicar classificação</button></div>
         </div>}
         {bulkNotice && <p role="status" className="mt-2 text-sm text-emerald-700">{bulkNotice}</p>}
+        </div>
         <div className="mt-5 space-y-2">
           <div className="sticky top-0 z-30 hidden grid-cols-[120px_100px_minmax(240px,2fr)_minmax(170px,1.2fr)_130px_130px] gap-3 rounded-xl border border-white/80 bg-[#F1F3F8]/95 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#8190A4] shadow-sm backdrop-blur-2xl lg:grid">
             {([["status", "Situação"], ["date", "Data"], ["description", "Descrição"], ["category", "Categoria"], ["card", "Cartão"], ["amount", "Valor"]] as const).map(([column, label]) => (
