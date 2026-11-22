@@ -162,6 +162,11 @@ export default function CardsManager({ entries, onChange, categories, onCategori
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [cardFilter, setCardFilter] = useState("Todos");
   const [monthFilter, setMonthFilter] = useState("Todos");
+  const [selectedEntryIds, setSelectedEntryIds] = useState<string[]>([]);
+  const [bulkCategoryId, setBulkCategoryId] = useState("");
+  const [bulkSubcategoryId, setBulkSubcategoryId] = useState("");
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkNotice, setBulkNotice] = useState("");
   const [treatmentFilter, setTreatmentFilter] = useState<"all" | "treated" | "untreated">("all");
   const expenseCategories = categories.filter((category) => category.type === "expense");
   const hasCompleteClassification = (entry: CardEntry) => {
@@ -207,6 +212,23 @@ export default function CardsManager({ entries, onChange, categories, onCategori
     const comparison = typeof av === "number" && typeof bv === "number" ? av - bv : String(av).localeCompare(String(bv), "pt-BR", { sensitivity: "base", numeric: true });
     return (cardSortDirection === "asc" ? comparison : -comparison) || b.date.localeCompare(a.date) || a.id.localeCompare(b.id);
   });
+  const eligibleForBulk = (entry: CardEntry) => {
+    const kind = entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase");
+    return kind === "purchase" || (kind === "credit" && entry.creditNature === "refund");
+  };
+  const visibleEligibleIds = filtered.filter(eligibleForBulk).map(entry => entry.id);
+  const selectedEligible = entries.filter(entry => selectedEntryIds.includes(entry.id) && eligibleForBulk(entry));
+  function applyBulkCategory() {
+    const category = expenseCategories.find(item => item.id === bulkCategoryId);
+    if (!category || !category.subcategories.some(item => item.id === bulkSubcategoryId) || selectedEligible.length === 0) return;
+    const ids = new Set(selectedEligible.map(entry => entry.id));
+    onChange(entries.map(entry => ids.has(entry.id) ? {...entry,categoryId:bulkCategoryId,subcategoryId:bulkSubcategoryId,refundedPurchaseId:undefined} : entry));
+    setBulkNotice(selectedEligible.length + " lançamento(s) categorizado(s).");
+    setSelectedEntryIds([]);
+    setBulkOpen(false);
+    setBulkCategoryId("");
+    setBulkSubcategoryId("");
+  }
   function updateEntry(id: string, changes: Partial<CardEntry>) { onChange(entries.map((entry) => entry.id === id ? { ...entry, ...changes } : entry)); }
   const [preview, setPreview] = useState<Draft[]>([]);
   const [fileName, setFileName] = useState("");
@@ -391,6 +413,20 @@ export default function CardsManager({ entries, onChange, categories, onCategori
             <button key={value} type="button" aria-pressed={treatmentFilter === value} onClick={() => setTreatmentFilter(value)} className={`rounded-xl border px-4 py-2 text-sm font-semibold transition-colors ${treatmentFilter === value ? "border-[#A7BBD6] bg-white/90 text-[#344D70] shadow-sm" : "border-white/80 bg-white/45 text-[#718198] hover:bg-white/70"}`}>{label}</button>
           ))}
         </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <label className="inline-flex items-center gap-2 text-sm font-medium text-[#526B8B]"><input type="checkbox" checked={visibleEligibleIds.length > 0 && visibleEligibleIds.every(id=>selectedEntryIds.includes(id))} onChange={event=>setSelectedEntryIds(current=>event.target.checked?Array.from(new Set([...current,...visibleEligibleIds])):current.filter(id=>!visibleEligibleIds.includes(id)))} /> Selecionar elegíveis visíveis</label>
+          {selectedEntryIds.length > 0 && <><span className="text-sm text-[#64748B]">{selectedEligible.length} selecionado(s)</span><button type="button" onClick={()=>{setBulkOpen(value=>!value);setBulkNotice("");}} className="rounded-xl border border-[#A7BBD6] bg-white/85 px-3 py-2 text-sm font-semibold text-[#344D70]">Categorizar em lote</button><button type="button" onClick={()=>{setSelectedEntryIds([]);setBulkOpen(false);}} className="rounded-xl px-3 py-2 text-sm text-[#64748B]">Limpar seleção</button></>}
+        </div>
+        {bulkOpen && selectedEligible.length > 0 && <div className="relative z-40 mt-3 space-y-3 rounded-2xl border border-white/90 bg-white/80 p-4 shadow-sm">
+          <p className="text-sm font-semibold text-[#344D70]">Categorizar {selectedEligible.length} lançamento(s) em lote</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <GlassSelect label="Categoria" value={bulkCategoryId} options={[{value:"",label:"Selecionar categoria"},...expenseCategories.map(category=>({value:category.id,label:category.name}))]} onChange={value=>{setBulkCategoryId(value);setBulkSubcategoryId("");}} />
+            <GlassSelect label="Subcategoria" disabled={!bulkCategoryId} value={bulkSubcategoryId} options={[{value:"",label:"Selecionar subcategoria"},...(expenseCategories.find(category=>category.id===bulkCategoryId)?.subcategories??[]).map(item=>({value:item.id,label:item.name}))]} onChange={setBulkSubcategoryId}/>
+          </div>
+          <p className="text-xs text-[#64748B]">Aplica a mesma categoria e subcategoria às compras e estornos de compra selecionados. Pagamentos, cashbacks e ajustes não serão alterados.</p>
+          <div className="flex justify-end gap-2"><button type="button" onClick={()=>setBulkOpen(false)} className="rounded-xl bg-white/70 px-4 py-2 text-sm">Cancelar</button><button type="button" disabled={!bulkSubcategoryId} onClick={applyBulkCategory} className="rounded-xl bg-[#344D70] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Aplicar classificação</button></div>
+        </div>}
+        {bulkNotice && <p role="status" className="mt-2 text-sm text-emerald-700">{bulkNotice}</p>}
         <div className="mt-5 space-y-2">
           <div className="sticky top-0 z-30 hidden grid-cols-[120px_100px_minmax(240px,2fr)_minmax(170px,1.2fr)_130px_130px] gap-3 rounded-xl border border-white/80 bg-[#F1F3F8]/95 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#8190A4] shadow-sm backdrop-blur-2xl lg:grid">
             {([["status", "Situação"], ["date", "Data"], ["description", "Descrição"], ["category", "Categoria"], ["card", "Cartão"], ["amount", "Valor"]] as const).map(([column, label]) => (
@@ -412,6 +448,7 @@ export default function CardsManager({ entries, onChange, categories, onCategori
             const glassBackground = credit ? "linear-gradient(120deg, rgba(101,221,172,0.59), rgba(211,251,233,0.48))" : "linear-gradient(120deg, rgba(251,155,171,0.62), rgba(255,224,230,0.49))";
             const glassBorder = credit ? "rgba(16,185,129,0.55)" : "rgba(225,72,102,0.56)";
             return <div key={entry.id} onClick={(event) => { if ((event.target as HTMLElement).closest("button, input, select, textarea, label, a, [role=combobox], [role=listbox]")) return; setEditingEntryId(current => current === entry.id ? null : entry.id); }} style={{background: kind === "payment" ? "rgba(255,255,255,0.40)" : classified ? (credit ? "linear-gradient(120deg, rgba(167,243,208,0.20), rgba(236,253,245,0.18))" : "linear-gradient(120deg, rgba(254,205,211,0.22), rgba(255,240,242,0.19))") : glassBackground, borderColor: kind === "payment" ? "rgba(203,213,225,0.55)" : classified ? (credit ? "rgba(52,211,153,0.22)" : "rgba(244,114,136,0.22)") : glassBorder}} className={`relative cursor-pointer overflow-visible rounded-2xl border px-4 py-3 transition-shadow hover:shadow-md shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_5px_18px_rgba(70,90,120,0.035)] backdrop-blur-xl ${editing ? "z-40 ring-1 ring-[#A7BBD6]" : "z-0"}`}>
+              {eligibleForBulk(entry) && <label className="mb-2 inline-flex cursor-pointer items-center gap-2 text-xs text-[#526B8B]" onClick={event=>event.stopPropagation()}><input type="checkbox" checked={selectedEntryIds.includes(entry.id)} onChange={event=>{setBulkNotice("");setSelectedEntryIds(current=>event.target.checked?[...current.filter(id=>id!==entry.id),entry.id]:current.filter(id=>id!==entry.id));}} /> Selecionar</label>}
               <div className="grid grid-cols-1 gap-2 lg:grid-cols-[120px_100px_minmax(240px,2fr)_minmax(170px,1.2fr)_130px_130px] lg:gap-3">
                 <span className="inline-flex h-8 w-[116px] items-center justify-center rounded-lg border border-white/75 bg-white/55 px-2 text-xs font-semibold text-[#526B8B]">{kind === "payment" ? "Pagamento" : classified ? "Classificado" : "A tratar"}</span>
                 <span className="text-xs text-[#64748B] lg:pt-1">{entry.date.split("-").reverse().join("/")}</span>
