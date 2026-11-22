@@ -164,10 +164,17 @@ export default function CardsManager({ entries, onChange, categories, onCategori
   const [monthFilter, setMonthFilter] = useState("Todos");
   const [treatmentFilter, setTreatmentFilter] = useState<"all" | "treated" | "untreated">("all");
   const expenseCategories = categories.filter((category) => category.type === "expense");
-  const creditIsTreated = (entry: CardEntry) => entry.creditNature === "cashback" || entry.creditNature === "adjustment" || (entry.creditNature === "refund" && Boolean(entry.refundedPurchaseId || expenseCategories.some(category => category.id === entry.categoryId)));
+  const hasCompleteClassification = (entry: CardEntry) => {
+    const category = expenseCategories.find(item => item.id === entry.categoryId);
+    return Boolean(category && category.subcategories.some(subcategory => subcategory.id === entry.subcategoryId));
+  };
+  const creditIsTreated = (entry: CardEntry) =>
+    entry.creditNature === "cashback" ||
+    entry.creditNature === "adjustment" ||
+    (entry.creditNature === "refund" && hasCompleteClassification(entry));
   const entryIsTreated = (entry: CardEntry) => {
     const kind = entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase");
-    return kind === "payment" || (kind === "credit" ? creditIsTreated(entry) : expenseCategories.some(category => category.id === entry.categoryId));
+    return kind === "payment" || (kind === "credit" ? creditIsTreated(entry) : hasCompleteClassification(entry));
   };
   const months = Array.from(new Set(entries.map((entry) => entry.date.slice(0, 7)))).sort().reverse();
   type CardSortColumn = "status" | "date" | "description" | "category" | "card" | "amount";
