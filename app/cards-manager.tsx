@@ -162,7 +162,30 @@ export default function CardsManager({ entries, onChange, categories, descriptio
   const [monthFilter, setMonthFilter] = useState("Todos");
   const expenseCategories = categories.filter((category) => category.type === "expense");
   const months = Array.from(new Set(entries.map((entry) => entry.date.slice(0, 7)))).sort().reverse();
-  const filtered = entries.filter((entry) => (cardFilter === "Todos" || entry.card === cardFilter) && (monthFilter === "Todos" || entry.date.startsWith(monthFilter))).sort((a, b) => b.date.localeCompare(a.date));
+  type CardSortColumn = "status" | "date" | "description" | "category" | "card" | "amount";
+  const [cardSort, setCardSort] = useState<CardSortColumn>("date");
+  const [cardSortDirection, setCardSortDirection] = useState<"asc" | "desc">("desc");
+  function changeCardSort(column: CardSortColumn) {
+    if (cardSort === column) setCardSortDirection(direction => direction === "asc" ? "desc" : "asc");
+    else { setCardSort(column); setCardSortDirection(column === "date" || column === "amount" ? "desc" : "asc"); }
+  }
+  const cardSortValue = (entry: CardEntry, column: CardSortColumn): string | number => {
+    const kind = entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase");
+    const category = expenseCategories.find(item => item.id === entry.categoryId);
+    switch (column) {
+      case "status": return kind === "payment" ? "Pagamento" : kind === "purchase" && category ? "Classificado" : "A tratar";
+      case "date": return entry.date;
+      case "description": return entry.description;
+      case "category": return category?.name ?? "";
+      case "card": return entry.card;
+      case "amount": return entry.amountCents;
+    }
+  };
+  const filtered = entries.filter((entry) => (cardFilter === "Todos" || entry.card === cardFilter) && (monthFilter === "Todos" || entry.date.startsWith(monthFilter))).sort((a, b) => {
+    const av = cardSortValue(a, cardSort), bv = cardSortValue(b, cardSort);
+    const comparison = typeof av === "number" && typeof bv === "number" ? av - bv : String(av).localeCompare(String(bv), "pt-BR", { sensitivity: "base", numeric: true });
+    return (cardSortDirection === "asc" ? comparison : -comparison) || b.date.localeCompare(a.date) || a.id.localeCompare(b.id);
+  });
   function updateEntry(id: string, changes: Partial<CardEntry>) { onChange(entries.map((entry) => entry.id === id ? { ...entry, ...changes } : entry)); }
   const [preview, setPreview] = useState<Draft[]>([]);
   const [fileName, setFileName] = useState("");
@@ -344,7 +367,11 @@ export default function CardsManager({ entries, onChange, categories, descriptio
         </div>
         <div className="mt-5 space-y-2">
           <div className="sticky top-0 z-30 hidden grid-cols-[120px_100px_minmax(240px,2fr)_minmax(170px,1.2fr)_130px_130px] gap-3 rounded-xl border border-white/80 bg-[#F1F3F8]/95 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#8190A4] shadow-sm backdrop-blur-2xl lg:grid">
-            <span>Situação</span><span>Data</span><span>Descrição</span><span>Categoria</span><span>Cartão</span><span className="text-right">Valor</span>
+            {([["status", "Situação"], ["date", "Data"], ["description", "Descrição"], ["category", "Categoria"], ["card", "Cartão"], ["amount", "Valor"]] as const).map(([column, label]) => (
+              <button key={column} type="button" onClick={() => changeCardSort(column)} aria-label={`Ordenar por ${label}`} aria-pressed={cardSort === column} className={`flex items-center gap-1 text-left transition-colors hover:text-[#344D70] focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500 ${column === "amount" ? "justify-end text-right" : ""} ${cardSort === column ? "text-[#344D70]" : ""}`}>
+                {label}<span aria-hidden="true">{cardSort === column ? (cardSortDirection === "asc" ? "↑" : "↓") : "↕"}</span>
+              </button>
+            ))}
           </div>
           {filtered.map((entry) => {
             const kind = entry.kind ?? (entry.amountCents < 0 ? "credit" : "purchase");
